@@ -14,6 +14,64 @@ import type { BackgroundRequest, BackgroundResponse } from "../shared/messages";
 import type { AiProvider, CleanupLogEntry, HistoryRecord, RuntimeTabSnapshot, SiteRule } from "../shared/types";
 
 const tabIndex = new Map<number, RuntimeTabSnapshot>();
+const TAB_SNAPSHOT_PREFIX = "runtimeTabSnapshot:";
+const PENDING_AUTO_CLEANUP_RULE_IDS_KEY = "pendingAutoCleanupRuleIds";
+
+function tabSnapshotKey(tabId: number): string {
+  return `${TAB_SNAPSHOT_PREFIX}${tabId}`;
+}
+
+function tabSnapshotStorage(): chrome.storage.StorageArea {
+  return chrome.storage.session ?? chrome.storage.local;
+}
+
+async function getStoredTabSnapshot(tabId: number): Promise<RuntimeTabSnapshot | undefined> {
+  const key = tabSnapshotKey(tabId);
+  const result = await tabSnapshotStorage().get(key);
+  return result[key] as RuntimeTabSnapshot | undefined;
+}
+
+async function saveStoredTabSnapshot(snapshot: RuntimeTabSnapshot): Promise<void> {
+  await tabSnapshotStorage().set({ [tabSnapshotKey(snapshot.tabId)]: snapshot });
+}
+
+async function removeStoredTabSnapshot(tabId: number): Promise<void> {
+  await tabSnapshotStorage().remove(tabSnapshotKey(tabId));
+}
+
+async function clearStoredTabSnapshots(): Promise<void> {
+  const values = await tabSnapshotStorage().get(null);
+  const keys = Object.keys(values).filter((key) => key.startsWith(TAB_SNAPSHOT_PREFIX));
+  if (keys.length) await tabSnapshotStorage().remove(keys);
+}
+
+async function getPendingAutoCleanupRuleIds(): Promise<string[]> {
+  const result = await chrome.storage.local.get(PENDING_AUTO_CLEANUP_RULE_IDS_KEY);
+  const raw = result[PENDING_AUTO_CLEANUP_RULE_IDS_KEY];
+  return Array.isArray(raw) ? raw.filter((item): item is string => typeof item === "string") : [];
+}
+
+async function setPendingAutoCleanupRuleIds(ruleIds: string[]): Promise<void> {
+  await chrome.storage.local.set({ [PENDING_AUTO_CLEANUP_RULE_IDS_KEY]: Array.from(new Set(ruleIds)) });
+}
+
+async function addPendingAutoCleanupRuleIds(ruleIds: string[]): Promise<void> {
+  if (!ruleIds.length) return;
+  await setPendingAutoCleanupRuleIds([...(await getPendingAutoCleanupRuleIds()), ...ruleIds]);
+}
+
+async function removePendingAutoCleanupRuleIds(ruleIds: string[]): Promise<void> {
+  if (!ruleIds.length) return;
+  const removed = new Set(ruleIds);
+  await setPendingAutoCleanupRuleIds((await getPendingAutoCleanupRuleIds()).filter((ruleId) => !removed.has(ruleId)));
+}
+
+async function prunePendingAutoCleanupRuleIds(rules: SiteRule[]): Promise<void> {
+  const autoRuleIds = new Set(
+    rules.filter((rule) => rule.enabled && rule.cleanupEnabled && rule.cleanupOnTabClose).map((rule) => rule.id)
+  );
+  await setPendingAutoCleanupRuleIds((await getPendingAutoCleanupRuleIds()).filter((ruleId) => autoRuleIds.has(ruleId)));
+}
 
 async function getDefaultProvider(providerId?: string): Promise<AiProvider> {
   const settings = await getSettings();
@@ -57,29 +115,44 @@ async function callProvider(provider: AiProvider, query: string, records: Histor
   return parseAiMatches(content);
 }
 
-async function getMatchingRuleIds(url: string, rules?: SiteRule[]) {
+async function getMatchingRules(url: string, rules?: SiteRule[]) {
   const siteRules = rules ?? (await getSiteRules());
-  return siteRules.filter((rule) => rule.cleanupEnabled && ruleMatchesUrl(rule, url)).map((rule) => rule.id);
+  return siteRules.filter((rule) => rule.cleanupEnabled && ruleMatchesUrl(rule, url));
+}
+
+async function getMatchingRuleIds(url: string, rules?: SiteRule[]) {
+  return (await getMatchingRules(url, rules)).map((rule) => rule.id);
 }
 
 async function rememberTab(tab: chrome.tabs.Tab) {
-  if (!tab.id || !tab.url || !/^https?:\/\//i.test(tab.url)) return;
-  const matchedRuleIds = await getMatchingRuleIds(tab.url);
-  if (!matchedRuleIds.length) {
+  if (!tab.id) return;
+  if (!tab.url || !/^https?:\/\//i.test(tab.url)) {
     tabIndex.delete(tab.id);
+    await removeStoredTabSnapshot(tab.id);
     return;
   }
-  tabIndex.set(tab.id, {
+  const matchedRules = await getMatchingRules(tab.url);
+  const matchedRuleIds = matchedRules.map((rule) => rule.id);
+  if (!matchedRuleIds.length) {
+    tabIndex.delete(tab.id);
+    await removeStoredTabSnapshot(tab.id);
+    return;
+  }
+  const snapshot = {
     tabId: tab.id,
     windowId: tab.windowId,
     url: tab.url,
     matchedRuleIds,
     updatedAt: Date.now()
-  });
+  };
+  tabIndex.set(tab.id, snapshot);
+  await saveStoredTabSnapshot(snapshot);
+  await addPendingAutoCleanupRuleIds(matchedRules.filter((rule) => rule.cleanupOnTabClose).map((rule) => rule.id));
 }
 
 async function rebuildTabIndex() {
   tabIndex.clear();
+  await clearStoredTabSnapshots();
   const tabs = await chrome.tabs.query({});
   await Promise.all(tabs.map((tab) => rememberTab(tab)));
 }
@@ -110,10 +183,43 @@ async function cleanupRule(rule: SiteRule, trigger: CleanupLogEntry["trigger"]) 
 async function cleanupAfterTabClose(ruleIds: string[]) {
   if (!ruleIds.length) return;
   const rules = await getSiteRules();
+  const processedRuleIds = new Set<string>();
   for (const rule of rules.filter((item) => ruleIds.includes(item.id) && item.cleanupEnabled && item.enabled)) {
+    if (!rule.cleanupOnTabClose) {
+      processedRuleIds.add(rule.id);
+      continue;
+    }
     const stillOpen = await hasOpenMatchingTab(rule);
-    if (!stillOpen && rule.cleanupOnTabClose) await cleanupRule(rule, "tabClose");
+    if (!stillOpen) {
+      await cleanupRule(rule, "tabClose");
+      processedRuleIds.add(rule.id);
+    }
   }
+  await removePendingAutoCleanupRuleIds(Array.from(processedRuleIds));
+}
+
+async function cleanupPendingAutoCleanupRules() {
+  const pendingRuleIds = await getPendingAutoCleanupRuleIds();
+  if (!pendingRuleIds.length) return;
+
+  const rules = await getSiteRules();
+  const activeAutoRuleIds = new Set(
+    rules.filter((rule) => rule.enabled && rule.cleanupEnabled && rule.cleanupOnTabClose).map((rule) => rule.id)
+  );
+  const inactiveRuleIds = pendingRuleIds.filter((ruleId) => !activeAutoRuleIds.has(ruleId));
+  await removePendingAutoCleanupRuleIds(inactiveRuleIds);
+  await cleanupAfterTabClose(pendingRuleIds.filter((ruleId) => activeAutoRuleIds.has(ruleId)));
+}
+
+async function handleTabRemoved(tabId: number) {
+  const snapshot = tabIndex.get(tabId) ?? (await getStoredTabSnapshot(tabId));
+  tabIndex.delete(tabId);
+  await removeStoredTabSnapshot(tabId);
+  if (snapshot) {
+    await cleanupAfterTabClose(snapshot.matchedRuleIds);
+    return;
+  }
+  await cleanupPendingAutoCleanupRules();
 }
 
 async function handleMessage(message: BackgroundRequest): Promise<unknown> {
@@ -132,6 +238,7 @@ async function handleMessage(message: BackgroundRequest): Promise<unknown> {
       return getSiteRules();
     case "SAVE_SITE_RULES":
       await saveSiteRules(message.rules);
+      await prunePendingAutoCleanupRuleIds(message.rules);
       await rebuildTabIndex();
       return message.rules;
     case "GET_ACTIVE_TAB": {
@@ -180,7 +287,9 @@ chrome.runtime.onInstalled.addListener(() => {
 });
 
 chrome.runtime.onStartup.addListener(() => {
-  rebuildTabIndex().catch(console.error);
+  rebuildTabIndex()
+    .then(() => cleanupPendingAutoCleanupRules())
+    .catch(console.error);
 });
 
 chrome.tabs.onUpdated.addListener((_tabId, changeInfo, tab) => {
@@ -188,9 +297,7 @@ chrome.tabs.onUpdated.addListener((_tabId, changeInfo, tab) => {
 });
 
 chrome.tabs.onRemoved.addListener((tabId) => {
-  const snapshot = tabIndex.get(tabId);
-  tabIndex.delete(tabId);
-  if (snapshot) cleanupAfterTabClose(snapshot.matchedRuleIds).catch(console.error);
+  handleTabRemoved(tabId).catch(console.error);
 });
 
 chrome.runtime.onMessage.addListener((message: BackgroundRequest, _sender, sendResponse) => {
