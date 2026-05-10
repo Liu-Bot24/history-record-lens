@@ -67,3 +67,7 @@ The API key is stored in local browser extension storage. Use it only on trusted
 - `sidePanel`: open the extension interface in the Chrome side panel.
 - `favicon`: display website icons.
 - Optional host permissions: requested only for the API domain you configure when testing or calling a model service.
+
+## License
+
+MIT
