@@ -2,6 +2,8 @@
 
 # 历史记录透镜
 
+![历史记录透镜横幅](docs/assets/history-record-lens-banner-1400x560.jpg)
+
 Languages: [简体中文](README.md) · [English](README-en.md)
 
 </div>

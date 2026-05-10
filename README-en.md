@@ -2,6 +2,8 @@
 
 # History Record Lens
 
+![History Record Lens banner](docs/assets/history-record-lens-banner-1400x560.jpg)
+
 Languages: [简体中文](README.md) · [English](README-en.md)
 
 </div>
