@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.vite/
+coverage/
+test-results/
+playwright-report/
+output/
+releases/
+docs/superpowers/
+*.log
+.DS_Store
+.env
+.env.*
+!.env.example
