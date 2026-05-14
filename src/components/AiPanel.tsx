@@ -1,12 +1,13 @@
 import { Brain, Check, ChevronDown, ChevronUp, Eye, EyeOff, Plus, Search, TestTube2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { cleanupTimeRangeToFilter } from "../shared/cleanupTimeRange";
 import { ensureApiHostPermission, reorderDefaultProvider, sendToBackground } from "../shared/client";
+import { pruneHistorySelection, selectedHistoryUrls } from "../shared/historySelection";
 import { loadSortByConfidencePreference, saveSortByConfidencePreference } from "../shared/localPreferences";
 import { newId } from "../shared/siteRules";
 import { formatAiQueryFailureStatus } from "../shared/statusMessages";
 import type { AiProvider, AppSettings, CleanupTimeRange, HistoryFilter, HistoryRecord } from "../shared/types";
-import { HistoryList } from "./HistoryPanel";
+import { HistoryBulkActions, HistoryList } from "./HistoryPanel";
 
 interface AiPanelProps {
   settings: AppSettings;
@@ -35,6 +36,77 @@ function modelLabel(provider: AiProvider | undefined): string {
   return provider?.model.trim() || provider?.name.trim() || "未配置";
 }
 
+function cssPixelValue(value: string): number {
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function useHistoryTitleLayout(selectedCount: number, recordCount: number) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [stacked, setStacked] = useState(false);
+
+  useLayoutEffect(() => {
+    const root = ref.current;
+    if (!root || !selectedCount) {
+      setStacked(false);
+      return;
+    }
+
+    let frame = 0;
+    const measure = () => {
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => {
+        const title = root.querySelector<HTMLElement>("[data-history-title-label]");
+        const actions = root.querySelector<HTMLElement>("[data-history-bulk-actions]");
+        const sort = root.querySelector<HTMLElement>("[data-history-sort]");
+        if (!title || !actions || !sort) {
+          setStacked(false);
+          return;
+        }
+
+        const wasStacked = root.classList.contains("is-stacked");
+        if (wasStacked) root.classList.remove("is-stacked");
+        const rootStyle = window.getComputedStyle(root);
+        const actionStyle = window.getComputedStyle(actions);
+        const rootGap = cssPixelValue(rootStyle.columnGap || rootStyle.gap);
+        const actionGap = cssPixelValue(actionStyle.columnGap || actionStyle.gap);
+        const actionItems = Array.from(actions.children) as HTMLElement[];
+        const actionWidth =
+          actionItems.reduce((total, item) => total + item.scrollWidth, 0) +
+          Math.max(0, actionItems.length - 1) * actionGap;
+        const requiredWidth =
+          title.getBoundingClientRect().width + actionWidth + sort.scrollWidth + rootGap * 2;
+        if (wasStacked) root.classList.add("is-stacked");
+
+        setStacked((current) => {
+          const next = requiredWidth > root.getBoundingClientRect().width + 0.5;
+          return current === next ? current : next;
+        });
+      });
+    };
+
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(root);
+    if (root.parentElement) observer.observe(root.parentElement);
+    const actions = root.querySelector<HTMLElement>("[data-history-bulk-actions]");
+    if (actions) observer.observe(actions);
+    const interval = window.setInterval(measure, 150);
+    window.addEventListener("resize", measure);
+    window.visualViewport?.addEventListener("resize", measure);
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.clearInterval(interval);
+      observer.disconnect();
+      window.removeEventListener("resize", measure);
+      window.visualViewport?.removeEventListener("resize", measure);
+    };
+  }, [recordCount, selectedCount]);
+
+  return { ref, stacked };
+}
+
 export function AiPanel({ settings, setSettings, setStatus }: AiPanelProps) {
   const selectedProvider = useMemo(
     () =>
@@ -50,6 +122,7 @@ export function AiPanel({ settings, setSettings, setStatus }: AiPanelProps) {
   const [prompt, setPrompt] = useState("");
   const [timeRange, setTimeRange] = useState<CleanupTimeRange>({ mode: "all" });
   const [records, setRecords] = useState<HistoryRecord[]>([]);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [sortByConfidence, setSortByConfidence] = useState(loadSortByConfidencePreference);
   const [modelOpen, setModelOpen] = useState(false);
   const [showKey, setShowKey] = useState(false);
@@ -86,6 +159,12 @@ export function AiPanel({ settings, setSettings, setStatus }: AiPanelProps) {
     if (sortByConfidence) return records;
     return [...records].sort((a, b) => b.lastVisitTime - a.lastVisitTime);
   }, [records, sortByConfidence]);
+  const selectedUrls = useMemo(() => selectedHistoryUrls(sortedRecords, selected), [selected, sortedRecords]);
+  const historyTitleLayout = useHistoryTitleLayout(selectedUrls.length, sortedRecords.length);
+
+  useEffect(() => {
+    setSelected((previous) => pruneHistorySelection(sortedRecords, previous));
+  }, [sortedRecords]);
 
   useEffect(() => {
     let cancelled = false;
@@ -167,6 +246,7 @@ export function AiPanel({ settings, setSettings, setStatus }: AiPanelProps) {
     try {
       const result = await sendToBackground({ type: "AI_QUERY", providerId: provider.id, query: prompt, filter: exactFilter as HistoryFilter });
       setRecords(result.records);
+      setSelected(new Set());
       if (result.debug.batchErrors.length) {
         setStatus(formatAiQueryFailureStatus(`AI 查询有 ${result.debug.batchErrors.length} 批失败：${result.debug.batchErrors[0].message}`));
       }
@@ -209,6 +289,34 @@ export function AiPanel({ settings, setSettings, setStatus }: AiPanelProps) {
   function updateSortByConfidence(value: boolean) {
     setSortByConfidence(value);
     saveSortByConfidencePreference(value);
+  }
+
+  async function openSelectedRecords() {
+    if (!selectedUrls.length) return;
+    setLoading(true);
+    try {
+      await Promise.all(selectedUrls.map((url) => sendToBackground({ type: "OPEN_URL", url })));
+      setStatus(`已打开 ${selectedUrls.length} 条历史记录`);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : String(error));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function deleteSelectedRecords() {
+    if (!selectedUrls.length) return;
+    setLoading(true);
+    try {
+      const result = await sendToBackground({ type: "DELETE_URLS", urls: selectedUrls });
+      setStatus(`已删除 ${result.deletedCount} 条 URL 历史`);
+      setRecords((previous) => previous.filter((record) => !selected.has(record.id)));
+      setSelected(new Set());
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : String(error));
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -336,14 +444,25 @@ export function AiPanel({ settings, setSettings, setStatus }: AiPanelProps) {
         </section>
       </div>
 
-      <div className="history-results-title">
-        <span>历史记录</span>
-        <label className="confidence-switch">
+      <div
+        className={historyTitleLayout.stacked ? "history-results-title is-stacked" : "history-results-title"}
+        ref={historyTitleLayout.ref}
+      >
+        <span data-history-title-label="true">历史记录</span>
+        <HistoryBulkActions
+          records={sortedRecords}
+          selected={selected}
+          setSelected={setSelected}
+          loading={loading}
+          onOpenSelected={openSelectedRecords}
+          onDeleteSelected={deleteSelectedRecords}
+        />
+        <label className="confidence-switch" data-history-sort="true">
           <input checked={sortByConfidence} onChange={(event) => updateSortByConfidence(event.target.checked)} type="checkbox" />
-          按置信度排序
+          <span>按置信度排序</span>
         </label>
       </div>
-      <HistoryList records={sortedRecords} setStatus={setStatus} />
+      <HistoryList records={sortedRecords} selected={selected} setSelected={setSelected} setStatus={setStatus} />
     </section>
   );
 }

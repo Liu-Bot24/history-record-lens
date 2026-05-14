@@ -1,6 +1,13 @@
 import { ExternalLink, RotateCcw, Search, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { sendToBackground } from "../shared/client";
+import {
+  pruneHistorySelection,
+  selectAllHistory,
+  selectedHistoryRecords,
+  selectedHistoryUrls,
+  toggleHistorySelection
+} from "../shared/historySelection";
 import type { HistoryFilter, HistoryRecord } from "../shared/types";
 import { cleanUrlPattern, extractHost } from "../shared/url";
 
@@ -15,10 +22,7 @@ export function HistoryPanel({ setStatus }: HistoryPanelProps) {
   const [loading, setLoading] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
 
-  const selectedUrls = useMemo(
-    () => records.filter((record) => selected.has(record.id)).map((record) => record.url),
-    [records, selected]
-  );
+  const selectedUrls = useMemo(() => selectedHistoryUrls(records, selected), [records, selected]);
 
   async function runSearch() {
     setLoading(true);
@@ -49,6 +53,19 @@ export function HistoryPanel({ setStatus }: HistoryPanelProps) {
     }
   }
 
+  async function openUrls(urls: string[]) {
+    if (!urls.length) return;
+    setLoading(true);
+    try {
+      await Promise.all(urls.map((url) => sendToBackground({ type: "OPEN_URL", url })));
+      setStatus(`已打开 ${urls.length} 条历史记录`);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : String(error));
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <section className="panel results-panel">
       <div className="history-command-form">
@@ -68,10 +85,14 @@ export function HistoryPanel({ setStatus }: HistoryPanelProps) {
         {filterOpen ? <FilterGrid filter={filter} setFilter={setFilter} includeText={false} compact /> : null}
       </div>
       <div className="toolbar compact-toolbar">
-        <button onClick={() => deleteUrls(selectedUrls)} disabled={!selectedUrls.length || loading} type="button">
-          <Trash2 size={16} />
-          删除已选
-        </button>
+        <HistoryBulkActions
+          records={records}
+          selected={selected}
+          setSelected={setSelected}
+          loading={loading}
+          onOpenSelected={() => openUrls(selectedUrls)}
+          onDeleteSelected={() => deleteUrls(selectedUrls)}
+        />
         <button
           onClick={() => deleteUrls(records.map((record) => record.url))}
           disabled={!records.length || loading}
@@ -86,6 +107,44 @@ export function HistoryPanel({ setStatus }: HistoryPanelProps) {
       </div>
       <HistoryList records={records} selected={selected} setSelected={setSelected} setStatus={setStatus} />
     </section>
+  );
+}
+
+export function HistoryBulkActions({
+  records,
+  selected,
+  setSelected,
+  loading,
+  onOpenSelected,
+  onDeleteSelected
+}: {
+  records: HistoryRecord[];
+  selected: Set<string>;
+  setSelected: React.Dispatch<React.SetStateAction<Set<string>>>;
+  loading?: boolean;
+  onOpenSelected: () => void | Promise<void>;
+  onDeleteSelected: () => void | Promise<void>;
+}) {
+  const selectedCount = selectedHistoryRecords(records, selected).length;
+  const allVisibleSelected = records.length > 0 && selectedCount === records.length;
+
+  if (!selectedCount) return null;
+
+  return (
+    <div className="history-bulk-actions" data-history-bulk-actions="true">
+      <span>{selectedCount} 项已选</span>
+      <button onClick={() => setSelected(allVisibleSelected ? new Set() : selectAllHistory(records))} disabled={loading} type="button">
+        {allVisibleSelected ? "取消全选" : "全选"}
+      </button>
+      <button onClick={() => void onOpenSelected()} disabled={loading} type="button">
+        <ExternalLink size={14} />
+        打开已选
+      </button>
+      <button onClick={() => void onDeleteSelected()} disabled={loading} type="button">
+        <Trash2 size={14} />
+        删除已选
+      </button>
+    </div>
   );
 }
 
@@ -201,10 +260,7 @@ export function HistoryList({
                 checked={checked}
                 onChange={() =>
                   setSelected((previous) => {
-                    const next = new Set(previous);
-                    if (next.has(record.id)) next.delete(record.id);
-                    else next.add(record.id);
-                    return next;
+                    return toggleHistorySelection(pruneHistorySelection(records, previous), record.id);
                   })
                 }
               />

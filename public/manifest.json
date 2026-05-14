@@ -1,8 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "历史记录透镜",
-  "description": "管理、清理和找回 Chrome 本地浏览历史。",
-  "version": "1.0.1",
+  "name": "历史记录透镜 - AI 查找浏览历史 | 一键清理记录",
+  "short_name": "历史透镜",
+  "description": "用大模型查找 Chrome 浏览历史，维护网站清单并一键清理本地浏览记录。",
+  "version": "1.0.2",
   "minimum_chrome_version": "116",
   "permissions": ["history", "storage", "tabs", "sidePanel", "favicon"],
   "optional_host_permissions": ["https://*/*", "http://*/*"],

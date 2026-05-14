@@ -332,18 +332,30 @@ main {
 
 .confidence-switch {
   min-height: 30px;
+  min-width: 0;
+  max-width: 100%;
   display: inline-flex;
   align-items: center;
+  justify-self: end;
   gap: 5px;
   color: var(--muted);
   font-size: 12px;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .confidence-switch input {
+  flex: 0 0 auto;
   width: 13px;
   height: 13px;
   accent-color: var(--accent);
+}
+
+.confidence-switch span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .model-fold {
@@ -447,17 +459,59 @@ main {
 
 .history-results-title {
   min-height: 24px;
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
+  max-width: 100%;
   color: var(--muted);
   font-size: 12px;
+  overflow: hidden;
 }
 
 .history-results-title > span {
   color: var(--text);
   font-weight: 750;
+}
+
+.history-bulk-actions {
+  min-width: 0;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 5px;
+}
+
+.history-bulk-actions > span {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.history-bulk-actions button {
+  flex: 0 0 auto;
+  min-height: 26px;
+  padding: 3px 7px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.history-results-title.is-stacked {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 136px);
+  row-gap: 6px;
+}
+
+.history-results-title.is-stacked .history-bulk-actions {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+
+.history-results-title.is-stacked .confidence-switch {
+  grid-column: 2;
+  grid-row: 1;
 }
 
 .home-panel {
