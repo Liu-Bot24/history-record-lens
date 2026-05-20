@@ -4,7 +4,7 @@
   "short_name": "__MSG_extShortName__",
   "description": "__MSG_extDescription__",
   "default_locale": "en",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "minimum_chrome_version": "116",
   "permissions": ["history", "storage", "tabs", "sidePanel", "favicon"],
   "optional_host_permissions": ["https://*/*", "http://*/*"],
