@@ -16,15 +16,15 @@ interface AiPanelProps {
 }
 
 const timeRangeOptions: Array<{ mode: CleanupTimeRange["mode"]; label: string }> = [
-  { mode: "all", label: "不限" },
-  { mode: "hour", label: "最近一小时" },
-  { mode: "day", label: "最近一天" },
-  { mode: "week", label: "最近七天" }
+  { mode: "all", label: "All time" },
+  { mode: "hour", label: "Past hour" },
+  { mode: "day", label: "Past day" },
+  { mode: "week", label: "Past week" }
 ];
 
 const defaultProviderDraft: AiProvider = {
   id: "draft",
-  name: "模型服务",
+  name: "Model Service",
   baseUrl: "",
   apiKey: "",
   model: "",
@@ -33,7 +33,7 @@ const defaultProviderDraft: AiProvider = {
 };
 
 function modelLabel(provider: AiProvider | undefined): string {
-  return provider?.model.trim() || provider?.name.trim() || "未配置";
+  return provider?.model.trim() || provider?.name.trim() || "Not configured";
 }
 
 function cssPixelValue(value: string): number {
@@ -190,12 +190,12 @@ export function AiPanel({ settings, setSettings, setStatus }: AiPanelProps) {
     };
   }, [exactFilter, setStatus]);
 
-  async function saveProvider(feedbackText = "模型配置已保存"): Promise<AiProvider | null> {
+  async function saveProvider(feedbackText = "Model settings saved"): Promise<AiProvider | null> {
     const existingProvider = settings.aiProviders.find((item) => item.id === activeProvider.id && activeProvider.id !== "draft");
     const provider: AiProvider = {
       ...activeProvider,
       id: existingProvider?.id ?? newId("provider"),
-      name: activeProvider.model.trim() || activeProvider.name.trim() || "模型服务",
+      name: activeProvider.model.trim() || activeProvider.name.trim() || "Model Service",
       baseUrl: activeProvider.baseUrl.trim(),
       apiKey: activeProvider.apiKey.trim(),
       model: activeProvider.model.trim(),
@@ -209,7 +209,7 @@ export function AiPanel({ settings, setSettings, setStatus }: AiPanelProps) {
     const nextSettings = reorderDefaultProvider({ ...settings, aiProviders: nextProviders, defaultProviderId: provider.id }, provider.id);
     const allowed = await ensureApiHostPermission(nextSettings, provider.id);
     if (!allowed) {
-      setModelFeedback({ tone: "error", text: "没有授予 API 域名访问权限" });
+      setModelFeedback({ tone: "error", text: "API domain access was not granted" });
       return null;
     }
     setSettings(nextSettings);
@@ -223,12 +223,12 @@ export function AiPanel({ settings, setSettings, setStatus }: AiPanelProps) {
   }
 
   async function testProvider() {
-    const provider = await saveProvider("正在测试连接...");
+    const provider = await saveProvider("Testing connection...");
     if (!provider) return;
-    setModelFeedback({ tone: "neutral", text: "正在测试连接..." });
+    setModelFeedback({ tone: "neutral", text: "Testing connection..." });
     try {
       await sendToBackground({ type: "TEST_AI_PROVIDER", providerId: provider.id });
-      setModelFeedback({ tone: "success", text: "连接测试通过" });
+      setModelFeedback({ tone: "success", text: "Connection test passed" });
     } catch (error) {
       setModelFeedback({ tone: "error", text: error instanceof Error ? error.message : String(error) });
     }
@@ -248,7 +248,7 @@ export function AiPanel({ settings, setSettings, setStatus }: AiPanelProps) {
       setRecords(result.records);
       setSelected(new Set());
       if (result.debug.batchErrors.length) {
-        setStatus(formatAiQueryFailureStatus(`AI 查询有 ${result.debug.batchErrors.length} 批失败：${result.debug.batchErrors[0].message}`));
+        setStatus(formatAiQueryFailureStatus(`AI query had ${result.debug.batchErrors.length} failed batch(es): ${result.debug.batchErrors[0].message}`));
       }
     } catch (error) {
       setStatus(formatAiQueryFailureStatus(error instanceof Error ? error.message : String(error)));
@@ -296,7 +296,7 @@ export function AiPanel({ settings, setSettings, setStatus }: AiPanelProps) {
     setLoading(true);
     try {
       await Promise.all(selectedUrls.map((url) => sendToBackground({ type: "OPEN_URL", url })));
-      setStatus(`已打开 ${selectedUrls.length} 条历史记录`);
+      setStatus(`Opened ${selectedUrls.length} history record(s)`);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
     } finally {
@@ -309,7 +309,7 @@ export function AiPanel({ settings, setSettings, setStatus }: AiPanelProps) {
     setLoading(true);
     try {
       const result = await sendToBackground({ type: "DELETE_URLS", urls: selectedUrls });
-      setStatus(`已删除 ${result.deletedCount} 条 URL 历史`);
+      setStatus(`Deleted ${result.deletedCount} URL history entr${result.deletedCount === 1 ? "y" : "ies"}`);
       setRecords((previous) => previous.filter((record) => !selected.has(record.id)));
       setSelected(new Set());
     } catch (error) {
@@ -328,7 +328,7 @@ export function AiPanel({ settings, setSettings, setStatus }: AiPanelProps) {
             <input
               value={exactText}
               onChange={(event) => setExactText(event.target.value)}
-              placeholder="搜索历史记录"
+              placeholder="Search history"
             />
           </div>
         </div>
@@ -345,14 +345,22 @@ export function AiPanel({ settings, setSettings, setStatus }: AiPanelProps) {
             </button>
           ))}
           <input
-            aria-label="开始日期"
-            type="date"
+            aria-label="Start date"
+            className="date-input"
+            inputMode="numeric"
+            pattern="\d{4}-\d{2}-\d{2}"
+            placeholder="YYYY-MM-DD"
+            type="text"
             value={timeRange.startDate ?? ""}
             onChange={(event) => setTimeRange((value) => ({ ...value, mode: "custom", startDate: event.target.value }))}
           />
           <input
-            aria-label="结束日期"
-            type="date"
+            aria-label="End date"
+            className="date-input"
+            inputMode="numeric"
+            pattern="\d{4}-\d{2}-\d{2}"
+            placeholder="YYYY-MM-DD"
+            type="text"
             value={timeRange.endDate ?? ""}
             onChange={(event) => setTimeRange((value) => ({ ...value, mode: "custom", endDate: event.target.value }))}
           />
@@ -365,23 +373,23 @@ export function AiPanel({ settings, setSettings, setStatus }: AiPanelProps) {
             onKeyDown={(event) => {
               if (event.key === "Enter") void runAiQuery();
             }}
-            placeholder="前几天看过一个工具或教程网页，想不起来名字了。"
+            placeholder="I saw a tool or tutorial page a few days ago but can't remember its name."
           />
           <button className="primary" onClick={runAiQuery} disabled={loading || !prompt.trim()} type="button">
             <Brain size={15} />
-            AI 查询
+            AI Query
           </button>
         </div>
 
         <section className="model-fold">
           <button className="model-fold-title" onClick={() => setModelOpen((value) => !value)} type="button">
-            <span>模型配置</span>
+            <span>Model Settings</span>
             <small>{modelLabel(activeProvider)}</small>
             {modelOpen ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
           </button>
           {modelOpen ? (
             <div className="model-config-grid">
-              <div className="model-tabs-row" aria-label="模型服务">
+              <div className="model-tabs-row" aria-label="Model services">
                 {settings.aiProviders.map((provider) => (
                   <button
                     className={editingProviderId === provider.id ? "model-tab is-active" : "model-tab"}
@@ -395,17 +403,17 @@ export function AiPanel({ settings, setSettings, setStatus }: AiPanelProps) {
                 ))}
                 {editingProviderId === "draft" ? (
                   <button className="model-tab is-active" type="button">
-                    新模型
+                    New Model
                   </button>
                 ) : null}
-                <button className="model-add-tab" onClick={addProviderDraft} title="添加模型" type="button">
+                <button className="model-add-tab" onClick={addProviderDraft} title="Add model" type="button">
                   <Plus size={14} />
                 </button>
               </div>
               <input
                 value={activeProvider.baseUrl}
                 onChange={(event) => patchProviderDraft({ baseUrl: event.target.value })}
-                placeholder="API 接口，例如 https://api.openai.com/v1"
+                placeholder="API endpoint, e.g. https://api.openai.com/v1"
               />
               <div className="secret-row compact">
                 <input
@@ -414,23 +422,23 @@ export function AiPanel({ settings, setSettings, setStatus }: AiPanelProps) {
                   onChange={(event) => patchProviderDraft({ apiKey: event.target.value })}
                   placeholder="API Key"
                 />
-                <button onClick={() => setShowKey((value) => !value)} type="button" title={showKey ? "隐藏" : "显示"}>
+                <button onClick={() => setShowKey((value) => !value)} type="button" title={showKey ? "Hide" : "Show"}>
                   {showKey ? <EyeOff size={14} /> : <Eye size={14} />}
                 </button>
               </div>
               <input
                 value={activeProvider.model}
                 onChange={(event) => patchProviderDraft({ model: event.target.value })}
-                placeholder="模型名称，例如 gpt-4.1-mini"
+                placeholder="Model name, e.g. gpt-4.1-mini"
               />
               <div className="model-config-actions">
                 <button className="primary" onClick={() => saveProvider()} type="button">
                   <Check size={14} />
-                  保存
+                  Save
                 </button>
                 <button onClick={testProvider} type="button">
                   <TestTube2 size={14} />
-                  测试
+                  Test
                 </button>
                 {modelFeedback ? (
                   <span className={`connection-indicator is-${modelFeedback.tone}`}>
@@ -448,7 +456,7 @@ export function AiPanel({ settings, setSettings, setStatus }: AiPanelProps) {
         className={historyTitleLayout.stacked ? "history-results-title is-stacked" : "history-results-title"}
         ref={historyTitleLayout.ref}
       >
-        <span data-history-title-label="true">历史记录</span>
+        <span data-history-title-label="true">History</span>
         <HistoryBulkActions
           records={sortedRecords}
           selected={selected}
@@ -459,7 +467,7 @@ export function AiPanel({ settings, setSettings, setStatus }: AiPanelProps) {
         />
         <label className="confidence-switch" data-history-sort="true">
           <input checked={sortByConfidence} onChange={(event) => updateSortByConfidence(event.target.checked)} type="checkbox" />
-          <span>按置信度排序</span>
+          <span>Sort by confidence</span>
         </label>
       </div>
       <HistoryList records={sortedRecords} selected={selected} setSelected={setSelected} setStatus={setStatus} />

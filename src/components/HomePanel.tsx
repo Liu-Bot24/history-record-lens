@@ -52,7 +52,7 @@ export function HomePanel({ rules, setRules, logs, setLogs, settings, setSetting
 
   async function saveTextList(text = listText) {
     const parsedRules = mergeParsedRules(parseSiteListImport(text), rules);
-    await persist(parsedRules, `清单已保存，当前 ${parsedRules.length} 个网站`);
+    await persist(parsedRules, `List saved with ${parsedRules.length} site(s)`);
     setListText(rulesToListText(parsedRules));
     setEditingList(false);
   }
@@ -71,7 +71,7 @@ export function HomePanel({ rules, setRules, logs, setLogs, settings, setSetting
         cleanupOnTabClose: false
       });
       const nextRules = mergeParsedRules([rule, ...rules], rules);
-      await persist(nextRules, "已添加当前网站");
+      await persist(nextRules, "Current site added");
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
     }
@@ -82,7 +82,7 @@ export function HomePanel({ rules, setRules, logs, setLogs, settings, setSetting
   }
 
   async function updateCleanupTimeRange(range: CleanupTimeRange) {
-    await persistSettings({ ...settings, cleanupTimeRange: range }, `清理时间范围：${cleanupTimeRangeLabel(range)}`);
+    await persistSettings({ ...settings, cleanupTimeRange: range }, `Cleanup range: ${cleanupTimeRangeLabel(range)}`);
   }
 
   async function toggleAutoCleanupForCleanupRules() {
@@ -94,12 +94,12 @@ export function HomePanel({ rules, setRules, logs, setLogs, settings, setSetting
           ? { ...rule, cleanupOnTabClose: rule.cleanupEnabled ? nextValue : false, updatedAt: Date.now() }
           : rule
       ),
-      nextValue ? "已启用自动清理" : "已停用自动清理"
+      nextValue ? "Auto cleanup enabled" : "Auto cleanup disabled"
     );
   }
 
   async function removeRule(ruleId: string) {
-    await persist(rules.filter((rule) => rule.id !== ruleId), "已从清单移除");
+    await persist(rules.filter((rule) => rule.id !== ruleId), "Removed from list");
   }
 
   async function openRule(rule: SiteRule) {
@@ -110,7 +110,7 @@ export function HomePanel({ rules, setRules, logs, setLogs, settings, setSetting
     setBusyRuleId(rule.id);
     try {
       const result = await sendToBackground({ type: "CLEAN_SITE_RULE", ruleId: rule.id });
-      setStatus(`已清理 ${result.deletedCount} 条 URL 历史`);
+      setStatus(`Deleted ${result.deletedCount} URL history entr${result.deletedCount === 1 ? "y" : "ies"}`);
       setLogs(await sendToBackground({ type: "GET_CLEANUP_LOG" }));
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
@@ -121,7 +121,7 @@ export function HomePanel({ rules, setRules, logs, setLogs, settings, setSetting
 
   async function cleanAllEnabled() {
     if (!cleanupRules.length) {
-      setStatus("还没有加入清理列表的网站");
+      setStatus("No sites are in the cleanup list yet");
       return;
     }
     let deletedCount = 0;
@@ -131,7 +131,7 @@ export function HomePanel({ rules, setRules, logs, setLogs, settings, setSetting
         const result = await sendToBackground({ type: "CLEAN_SITE_RULE", ruleId: rule.id });
         deletedCount += result.deletedCount;
       }
-      setStatus(`已清理 ${cleanupRules.length} 个网站，共 ${deletedCount} 条 URL 历史`);
+      setStatus(`Cleaned ${cleanupRules.length} site(s), deleting ${deletedCount} URL history entr${deletedCount === 1 ? "y" : "ies"}`);
       setLogs(await sendToBackground({ type: "GET_CLEANUP_LOG" }));
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
@@ -145,18 +145,18 @@ export function HomePanel({ rules, setRules, logs, setLogs, settings, setSetting
       <section className="command-bar">
         <button className="primary" onClick={cleanAllEnabled} disabled={!cleanupRules.length || busyRuleId === "all"} type="button">
           <ShieldCheck size={16} />
-          一键清理
+          One-Click Cleanup
         </button>
         <button onClick={addCurrentSite} type="button">
           <ListPlus size={16} />
-          添加当前网站
+          Add Current Site
         </button>
         <label
           className={autoCleanupEnabled ? "switch-control with-tooltip is-on" : "switch-control with-tooltip"}
-          data-tooltip="退出网站自动清理浏览记录"
-          aria-label="退出网站自动清理浏览记录"
+          data-tooltip="Clean matching history after a site closes"
+          aria-label="Clean matching history after a site closes"
         >
-          <span>自动清理</span>
+          <span>Auto</span>
           <input
             checked={autoCleanupEnabled}
             disabled={!cleanupRules.length}
@@ -170,7 +170,7 @@ export function HomePanel({ rules, setRules, logs, setLogs, settings, setSetting
       </section>
 
       <FoldSection
-        title="快捷访问"
+        title="Quick Access"
         open={openSections.quick}
         onToggle={() => setOpenSections((value) => ({ ...value, quick: !value.quick }))}
       >
@@ -184,21 +184,21 @@ export function HomePanel({ rules, setRules, logs, setLogs, settings, setSetting
             ))}
           </div>
         ) : (
-          <div className="empty-line">勾选星标的网站会出现在这里。</div>
+          <div className="empty-line">Starred sites will appear here.</div>
         )}
       </FoldSection>
 
       <FoldSection
         className="site-rules-section"
-        title="网站清单"
+        title="Website List"
         open={openSections.list}
         onToggle={() => setOpenSections((value) => ({ ...value, list: !value.list }))}
         action={
           <button
             className={listMode === "edit" ? "section-action with-tooltip is-on" : "section-action with-tooltip"}
-            title={listMode === "edit" ? "完成编辑" : "编辑清单"}
-            data-tooltip={listMode === "edit" ? "保存清单" : "编辑清单"}
-            aria-label={listMode === "edit" ? "完成编辑" : "编辑清单"}
+            title={listMode === "edit" ? "Done editing" : "Edit list"}
+            data-tooltip={listMode === "edit" ? "Save list" : "Edit list"}
+            aria-label={listMode === "edit" ? "Done editing" : "Edit list"}
             onClick={async (event) => {
               event.stopPropagation();
               setOpenSections((value) => ({ ...value, list: true }));
@@ -219,7 +219,7 @@ export function HomePanel({ rules, setRules, logs, setLogs, settings, setSetting
       >
         {listMode === "edit" ? (
           <div className="list-editor">
-            <p>格式：名称, 快捷访问 URL, 清理域名1, 清理域名2。每行一个网站。</p>
+            <p>Format: Name, quick access URL, cleanup domain 1, cleanup domain 2. Use one site per line.</p>
             <textarea
               autoFocus
               value={listText}
@@ -235,7 +235,7 @@ export function HomePanel({ rules, setRules, logs, setLogs, settings, setSetting
           <div className="history-like-list">
             {rules.map((rule) => (
               <article className="history-like-row" key={rule.id}>
-                <button className="history-like-link" onClick={() => openRule(rule)} title="打开网站" type="button">
+                <button className="history-like-link" onClick={() => openRule(rule)} title="Open site" type="button">
                   <SiteIcon rule={rule} />
                   <span className="history-like-main">
                     <span className="row-title">{rule.name}</span>
@@ -244,9 +244,9 @@ export function HomePanel({ rules, setRules, logs, setLogs, settings, setSetting
                 </button>
                 <button
                   className={rule.quickAccess ? "row-toggle with-tooltip is-on" : "row-toggle with-tooltip"}
-                  title={rule.quickAccess ? "已显示在快捷访问" : "显示在快捷访问"}
-                  data-tooltip={rule.quickAccess ? "取消快捷访问" : "加入快捷访问"}
-                  aria-label={rule.quickAccess ? "已显示在快捷访问" : "显示在快捷访问"}
+                  title={rule.quickAccess ? "Shown in Quick Access" : "Show in Quick Access"}
+                  data-tooltip={rule.quickAccess ? "Remove from Quick Access" : "Add to Quick Access"}
+                  aria-label={rule.quickAccess ? "Shown in Quick Access" : "Show in Quick Access"}
                   onClick={() => updateRule({ ...rule, quickAccess: !rule.quickAccess })}
                   type="button"
                 >
@@ -254,9 +254,9 @@ export function HomePanel({ rules, setRules, logs, setLogs, settings, setSetting
                 </button>
                 <button
                   className={rule.cleanupEnabled ? "row-toggle with-tooltip is-on" : "row-toggle with-tooltip"}
-                  title={rule.cleanupEnabled ? "已加入一键清理" : "加入一键清理"}
-                  data-tooltip={rule.cleanupEnabled ? "取消一键清理" : "加入一键清理"}
-                  aria-label={rule.cleanupEnabled ? "已加入一键清理" : "加入一键清理"}
+                  title={rule.cleanupEnabled ? "Included in One-Click Cleanup" : "Include in One-Click Cleanup"}
+                  data-tooltip={rule.cleanupEnabled ? "Remove from cleanup" : "Add to cleanup"}
+                  aria-label={rule.cleanupEnabled ? "Included in One-Click Cleanup" : "Include in One-Click Cleanup"}
                   onClick={() =>
                     updateRule({
                       ...rule,
@@ -270,34 +270,34 @@ export function HomePanel({ rules, setRules, logs, setLogs, settings, setSetting
                 </button>
                 <button
                   className="row-icon-button with-tooltip"
-                  title="立即清理历史"
-                  data-tooltip="立即清理"
+                  title="Clean history now"
+                  data-tooltip="Clean now"
                   onClick={() => cleanRule(rule)}
                   disabled={busyRuleId === rule.id}
                   type="button"
                 >
                   <Eraser size={14} />
                 </button>
-                <button className="row-icon-button with-tooltip" title="删除" data-tooltip="删除" onClick={() => removeRule(rule.id)} type="button">
+                <button className="row-icon-button with-tooltip" title="Delete" data-tooltip="Delete" onClick={() => removeRule(rule.id)} type="button">
                   <Trash2 size={14} />
                 </button>
               </article>
             ))}
           </div>
         ) : (
-          <div className="empty-line">还没有网站。可以写清单，也可以添加当前网站。</div>
+          <div className="empty-line">No sites yet. Write a list or add the current site.</div>
         )}
       </FoldSection>
 
       <FoldSection
         className="time-range-section"
-        title="清理时间范围"
+        title="Cleanup Time Range"
         meta={cleanupTimeRangeLabel(cleanupTimeRange)}
         open={openSections.time}
         onToggle={() => setOpenSections((value) => ({ ...value, time: !value.time }))}
       >
         <div className="time-range-panel">
-          <div className="range-options" role="group" aria-label="清理时间范围">
+          <div className="range-options" role="group" aria-label="Cleanup time range">
             {cleanupTimeRangeOptions.map((option) => (
               <button
                 className={cleanupTimeRange.mode === option.mode ? "range-option is-active" : "range-option"}
@@ -312,17 +312,23 @@ export function HomePanel({ rules, setRules, logs, setLogs, settings, setSetting
           {cleanupTimeRange.mode === "custom" ? (
             <div className="date-range-row">
               <label>
-                <span>开始日期</span>
+                <span>Start date</span>
                 <input
-                  type="date"
+                  inputMode="numeric"
+                  pattern="\d{4}-\d{2}-\d{2}"
+                  placeholder="YYYY-MM-DD"
+                  type="text"
                   value={cleanupTimeRange.startDate ?? ""}
                   onChange={(event) => updateCleanupTimeRange({ ...cleanupTimeRange, startDate: event.target.value })}
                 />
               </label>
               <label>
-                <span>结束日期</span>
+                <span>End date</span>
                 <input
-                  type="date"
+                  inputMode="numeric"
+                  pattern="\d{4}-\d{2}-\d{2}"
+                  placeholder="YYYY-MM-DD"
+                  type="text"
                   value={cleanupTimeRange.endDate ?? ""}
                   onChange={(event) => updateCleanupTimeRange({ ...cleanupTimeRange, endDate: event.target.value })}
                 />
@@ -362,7 +368,7 @@ function FoldSection({
         {action}
         {right ? <div className="fold-right">{right}</div> : null}
         {meta ? <small>{meta}</small> : null}
-        <button className="fold-toggle" onClick={onToggle} type="button" title={open ? "收起" : "展开"}>
+        <button className="fold-toggle" onClick={onToggle} type="button" title={open ? "Collapse" : "Expand"}>
           {open ? <ChevronUp size={17} /> : <ChevronDown size={17} />}
         </button>
       </div>

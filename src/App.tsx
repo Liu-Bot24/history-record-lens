@@ -10,8 +10,8 @@ import { DEFAULT_SETTINGS } from "./shared/types";
 type AppTab = "ai" | "cleanup";
 
 const tabs = [
-  { id: "ai", label: "AI 查询历史记录", icon: Brain },
-  { id: "cleanup", label: "一键清理浏览记录", icon: ShieldCheck }
+  { id: "ai", label: "AI History Search", icon: Brain },
+  { id: "cleanup", label: "One-Click Cleanup", icon: ShieldCheck }
 ] satisfies Array<{ id: AppTab; label: string; icon: typeof History }>;
 
 export default function App() {
@@ -43,17 +43,17 @@ export default function App() {
       <header className="topbar">
         <div>
           <div className="title-line">
-            <h1>历史记录透镜</h1>
+            <h1>History Record Lens</h1>
             <a className="author-link" href={AUTHOR_LINK} rel="noreferrer" target="_blank">
               {AUTHOR_TEXT}
             </a>
           </div>
           <p>
             {activeTab === "cleanup" && rules.length
-              ? `${quickRules.length} 个快捷入口，${cleanupRules.length} 个清理规则`
+              ? `${quickRules.length} shortcuts, ${cleanupRules.length} cleanup rules`
               : activeTab === "cleanup"
-                ? "快捷访问和清理清单"
-                : "用大模型查找和管理浏览历史"}
+                ? "Quick access and cleanup list"
+                : "Find and manage browsing history with AI"}
           </p>
         </div>
       </header>

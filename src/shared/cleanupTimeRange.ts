@@ -1,11 +1,11 @@
 import type { CleanupTimeRange, HistoryFilter } from "./types";
 
 export const cleanupTimeRangeOptions: Array<{ mode: CleanupTimeRange["mode"]; label: string }> = [
-  { mode: "all", label: "不限" },
-  { mode: "hour", label: "过去一小时" },
-  { mode: "day", label: "过去一天" },
-  { mode: "week", label: "过去七天" },
-  { mode: "custom", label: "日期区间" }
+  { mode: "all", label: "All time" },
+  { mode: "hour", label: "Past hour" },
+  { mode: "day", label: "Past day" },
+  { mode: "week", label: "Past week" },
+  { mode: "custom", label: "Custom range" }
 ];
 
 export function cleanupTimeRangeToFilter(range: CleanupTimeRange, now = Date.now()): HistoryFilter {
@@ -24,9 +24,9 @@ export function cleanupTimeRangeToFilter(range: CleanupTimeRange, now = Date.now
 
 export function cleanupTimeRangeLabel(range: CleanupTimeRange): string {
   const option = cleanupTimeRangeOptions.find((item) => item.mode === range.mode);
-  if (range.mode !== "custom") return option?.label ?? "不限";
-  if (range.startDate && range.endDate) return `${range.startDate} 至 ${range.endDate}`;
-  if (range.startDate) return `${range.startDate} 起`;
-  if (range.endDate) return `${range.endDate} 前`;
-  return "日期区间";
+  if (range.mode !== "custom") return option?.label ?? "All time";
+  if (range.startDate && range.endDate) return `${range.startDate} to ${range.endDate}`;
+  if (range.startDate) return `From ${range.startDate}`;
+  if (range.endDate) return `Before ${range.endDate}`;
+  return "Custom range";
 }

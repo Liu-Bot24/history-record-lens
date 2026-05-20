@@ -428,7 +428,7 @@ main {
   color: var(--accent);
 }
 
-.time-chip-row input[type="date"] {
+.time-chip-row .date-input {
   width: auto;
   min-height: 26px;
   max-width: 128px;

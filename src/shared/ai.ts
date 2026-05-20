@@ -22,7 +22,7 @@ interface BatchedAiMatchOptions {
 
 export class AiOutputParseError extends Error {
   constructor(public readonly snippet: string) {
-    super(`模型返回的不是 JSON：${snippet}`);
+    super(`Model returned non-JSON output: ${snippet}`);
     this.name = "AiOutputParseError";
   }
 }
@@ -57,7 +57,7 @@ function compactUrlForAi(url: string): string {
 
 function localDateParts(now: Date, timeZone: string) {
   return Object.fromEntries(
-    new Intl.DateTimeFormat("zh-CN", {
+    new Intl.DateTimeFormat("en-CA", {
       timeZone,
       year: "numeric",
       month: "2-digit",
@@ -91,20 +91,20 @@ export function buildAiChatRequest(
   options: AiQueryOptions & { temperature: number; now?: Date }
 ): AiChatRequest {
   const system = [
-    "你是一个浏览器历史记录的语义匹配助手。你的任务是根据用户的自然语言描述，从提供的历史记录列表中找出相关或潜在相关的网页。",
-    "请运用概念联想能力进行“语义桥接”，而非仅仅依赖字面的关键词匹配。",
+    "You are a semantic matching assistant for browser history. Your task is to find relevant or potentially relevant pages from the provided history records based on the user's natural-language description.",
+    "Use conceptual association for semantic bridging instead of relying only on literal keyword matches.",
     "",
-    "【匹配原则】",
-    "1. 意图推演：分析用户寻找的核心意图及其可能隶属的领域。如果记录的标题或 URL 包含与用户意图逻辑相关的元素（如同义词、关联品牌、行业概念），即使字面无重合也应视为命中。",
-    "2. 记忆容错：考虑到用户对网页内容的记忆可能模糊或存在事实偏差，只要历史记录在逻辑上能与用户意图产生合理的交集，即视为潜在命中。",
-    "3. 时间容错：当用户描述中包含时间线索时，请以输入的 `currentTime` 为参考基准进行推算。请注意，用户记忆的时间往往不够准确，匹配时需允许合理的误差范围，不要因为时间维度的轻微不符而排除语义上高度疑似的记录。",
-    "4. 召回优先：可以包含弱关联记录以保持较高的召回率，不要遗漏潜在的匹配可能。",
+    "Matching principles:",
+    "1. Infer intent: analyze the user's core intent and the likely domain it belongs to. If a record title or URL contains elements logically related to that intent, such as synonyms, related brands, or industry concepts, treat it as a match even without exact wording overlap.",
+    "2. Tolerate imperfect memory: the user's memory of page content may be vague or factually off. If a history record can reasonably intersect with the user's intent, treat it as a potential match.",
+    "3. Tolerate time ambiguity: when the user includes time clues, use the input `currentTime` as the reference point. User memory of timing is often imprecise, so allow a reasonable error range and do not exclude semantically strong candidates because of a minor time mismatch.",
+    "4. Prefer recall: include weakly related records when needed to maintain high recall. Do not miss plausible matches.",
     "",
-    "【输出格式要求】",
-    "1. 请只输出 JSON 格式数据，不要包含任何解释、分析或多余的文本。",
-    "2. JSON 结构严格如下：{\"matches\":[{\"id\":\"真实的history_id\",\"confidence\":0.85}]}",
-    "3. confidence 代表置信度（0.1 到 1.0）。强直接关联且时间相符给高分，弱泛化联想或时间偏差较大给低分。",
-    "4. 请仅使用输入数据中提供的 ID。如果完全没有潜在关联的记录，请返回 {\"matches\":[]}。"
+    "Output format requirements:",
+    "1. Output JSON only. Do not include explanations, analysis, or extra text.",
+    "2. The JSON structure must be exactly: {\"matches\":[{\"id\":\"actual_history_id\",\"confidence\":0.85}]}",
+    "3. confidence represents match confidence from 0.1 to 1.0. Give high scores to strong direct matches with consistent timing, and lower scores to weaker generalized associations or larger time mismatches.",
+    "4. Use only IDs provided in the input data. If there are no potentially related records, return {\"matches\":[]}."
   ].join("\n");
 
   const user = JSON.stringify({

@@ -3,8 +3,8 @@ import { AI_QUERY_FAILURE_NOTE, formatAiQueryFailureStatus } from "./statusMessa
 
 describe("status messages", () => {
   it("adds the large-model safety note below AI query failures", () => {
-    expect(formatAiQueryFailureStatus("AI 查询有 1 批失败：模型拒绝回答")).toBe(
-      `AI 查询有 1 批失败：模型拒绝回答\n${AI_QUERY_FAILURE_NOTE}`
+    expect(formatAiQueryFailureStatus("AI query had 1 failed batch: model refused to answer")).toBe(
+      `AI query had 1 failed batch: model refused to answer\n${AI_QUERY_FAILURE_NOTE}`
     );
   });
 });

@@ -31,7 +31,7 @@ export function HistoryPanel({ setStatus }: HistoryPanelProps) {
       const nextRecords = await sendToBackground({ type: "SEARCH_HISTORY", filter });
       setRecords(nextRecords);
       setSelected(new Set());
-      setStatus(`找到 ${nextRecords.length} 条历史记录`);
+      setStatus(`Found ${nextRecords.length} history record(s)`);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
     } finally {
@@ -44,7 +44,7 @@ export function HistoryPanel({ setStatus }: HistoryPanelProps) {
     setLoading(true);
     try {
       const result = await sendToBackground({ type: "DELETE_URLS", urls });
-      setStatus(`已删除 ${result.deletedCount} 条 URL 历史`);
+      setStatus(`Deleted ${result.deletedCount} URL history entr${result.deletedCount === 1 ? "y" : "ies"}`);
       await runSearch();
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
@@ -58,7 +58,7 @@ export function HistoryPanel({ setStatus }: HistoryPanelProps) {
     setLoading(true);
     try {
       await Promise.all(urls.map((url) => sendToBackground({ type: "OPEN_URL", url })));
-      setStatus(`已打开 ${urls.length} 条历史记录`);
+      setStatus(`Opened ${urls.length} history record(s)`);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
     } finally {
@@ -71,15 +71,15 @@ export function HistoryPanel({ setStatus }: HistoryPanelProps) {
       <div className="history-command-form">
         <div className="history-search-row">
           <label>
-            <span>关键词</span>
+            <span>Keywords</span>
             <input value={filter.text ?? ""} onChange={(event) => setFilter((item) => ({ ...item, text: event.target.value }))} />
           </label>
           <button className="primary" onClick={runSearch} disabled={loading} type="button">
             <Search size={15} />
-            查询
+            Search
           </button>
           <button onClick={() => setFilterOpen((value) => !value)} type="button">
-            筛选
+            Filters
           </button>
         </div>
         {filterOpen ? <FilterGrid filter={filter} setFilter={setFilter} includeText={false} compact /> : null}
@@ -99,9 +99,9 @@ export function HistoryPanel({ setStatus }: HistoryPanelProps) {
           type="button"
         >
           <Trash2 size={16} />
-          删除当前结果
+          Delete current results
         </button>
-        <button onClick={() => setRecords([])} disabled={loading} type="button" title="清空结果">
+        <button onClick={() => setRecords([])} disabled={loading} type="button" title="Clear results">
           <RotateCcw size={16} />
         </button>
       </div>
@@ -132,17 +132,17 @@ export function HistoryBulkActions({
 
   return (
     <div className="history-bulk-actions" data-history-bulk-actions="true">
-      <span>{selectedCount} 项已选</span>
+      <span>{selectedCount} selected</span>
       <button onClick={() => setSelected(allVisibleSelected ? new Set() : selectAllHistory(records))} disabled={loading} type="button">
-        {allVisibleSelected ? "取消全选" : "全选"}
+        {allVisibleSelected ? "Deselect all" : "Select all"}
       </button>
       <button onClick={() => void onOpenSelected()} disabled={loading} type="button">
         <ExternalLink size={14} />
-        打开已选
+        Open selected
       </button>
       <button onClick={() => void onDeleteSelected()} disabled={loading} type="button">
         <Trash2 size={14} />
-        删除已选
+        Delete selected
       </button>
     </div>
   );
@@ -168,12 +168,12 @@ export function FilterGrid({
     <div className={compact ? "filter-grid is-compact" : "filter-grid"}>
       {includeText ? (
         <label>
-            <span>关键词</span>
+            <span>Keywords</span>
           <input value={filter.text ?? ""} onChange={(event) => setFilter((item) => ({ ...item, text: event.target.value }))} />
         </label>
       ) : null}
       <label>
-          <span>域名</span>
+          <span>Domain</span>
         <input
           value={filter.domain ?? ""}
           onChange={(event) => setFilter((item) => ({ ...item, domain: event.target.value }))}
@@ -182,7 +182,7 @@ export function FilterGrid({
         />
       </label>
       <label>
-          <span>URL 包含</span>
+          <span>URL contains</span>
         <input
           value={filter.url ?? ""}
           onChange={(event) => setFilter((item) => ({ ...item, url: event.target.value }))}
@@ -191,7 +191,7 @@ export function FilterGrid({
         />
       </label>
       <label>
-          <span>开始时间</span>
+          <span>Start time</span>
         <input
           type="datetime-local"
           onChange={(event) =>
@@ -203,7 +203,7 @@ export function FilterGrid({
         />
       </label>
       <label>
-          <span>结束时间</span>
+          <span>End time</span>
         <input
           type="datetime-local"
           onChange={(event) =>
@@ -215,7 +215,7 @@ export function FilterGrid({
         />
       </label>
       <label>
-          <span>最多条数</span>
+          <span>Max results</span>
         <input
           type="number"
           min="0"
@@ -246,7 +246,7 @@ export function HistoryList({
     }
   }
 
-  if (!records.length) return <div className="empty-state">暂无历史记录</div>;
+  if (!records.length) return <div className="empty-state">No history records</div>;
 
   return (
     <div className="history-list">
@@ -265,7 +265,7 @@ export function HistoryList({
                 }
               />
             ) : null}
-            <button className="icon-button" onClick={() => openUrl(record.url)} type="button" title="打开">
+            <button className="icon-button" onClick={() => openUrl(record.url)} type="button" title="Open">
               <ExternalLink size={15} />
             </button>
             <div className="record-main">
@@ -273,8 +273,8 @@ export function HistoryList({
               <p>{record.url}</p>
               <div className="meta-line">
                 <span>{formatTime(record.lastVisitTime)}</span>
-                <span>{record.visitCount} 次访问</span>
-                <span>{record.typedCount} 次输入</span>
+                <span>{record.visitCount} visit{record.visitCount === 1 ? "" : "s"}</span>
+                <span>{record.typedCount} typed visit{record.typedCount === 1 ? "" : "s"}</span>
               </div>
             </div>
           </article>
@@ -285,8 +285,8 @@ export function HistoryList({
 }
 
 function formatTime(time: number) {
-  if (!time) return "未知时间";
-  return new Intl.DateTimeFormat(undefined, {
+  if (!time) return "Unknown time";
+  return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "2-digit",
     hour: "2-digit",

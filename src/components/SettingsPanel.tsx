@@ -24,7 +24,7 @@ export function SettingsPanel({ settings, setSettings, setStatus }: SettingsPane
     [settings.aiProviders, selectedId]
   );
 
-  async function persist(nextSettings: AppSettings, feedbackText = "设置已保存") {
+  async function persist(nextSettings: AppSettings, feedbackText = "Settings saved") {
     setSettings(nextSettings);
     await sendToBackground({ type: "SAVE_SETTINGS", settings: nextSettings });
     setStatus("");
@@ -34,7 +34,7 @@ export function SettingsPanel({ settings, setSettings, setStatus }: SettingsPane
   async function addProvider() {
     const provider: AiProvider = {
       id: newId("provider"),
-      name: "自定义 API",
+      name: "Custom API",
       baseUrl: "https://api.openai.com/v1",
       apiKey: "",
       model: "gpt-4.1-mini",
@@ -47,7 +47,7 @@ export function SettingsPanel({ settings, setSettings, setStatus }: SettingsPane
       aiProviders: [provider, ...settings.aiProviders]
     };
     setSelectedId(provider.id);
-    await persist(nextSettings, "已添加模型服务");
+    await persist(nextSettings, "Model service added");
   }
 
   async function updateProvider(patch: Partial<AiProvider>) {
@@ -65,7 +65,7 @@ export function SettingsPanel({ settings, setSettings, setStatus }: SettingsPane
     const nextSettings = selected.isDefault ? reorderDefaultProvider(settings, selected.id) : settings;
     const allowed = await ensureApiHostPermission(nextSettings, selected.id);
     if (!allowed) {
-      setFeedback({ tone: "error", text: "没有授予该 API 域名的访问权限" });
+      setFeedback({ tone: "error", text: "API domain access was not granted" });
       return null;
     }
     return nextSettings;
@@ -74,7 +74,7 @@ export function SettingsPanel({ settings, setSettings, setStatus }: SettingsPane
   async function saveSelected() {
     const nextSettings = await prepareSelectedSettings();
     if (!nextSettings) return;
-    await persist(nextSettings, "设置已保存");
+    await persist(nextSettings, "Settings saved");
   }
 
   async function testSelected() {
@@ -82,10 +82,10 @@ export function SettingsPanel({ settings, setSettings, setStatus }: SettingsPane
     const nextSettings = await prepareSelectedSettings();
     if (!nextSettings) return;
     await persist(nextSettings, "");
-    setFeedback({ tone: "neutral", text: "正在测试连接..." });
+    setFeedback({ tone: "neutral", text: "Testing connection..." });
     try {
       await sendToBackground({ type: "TEST_AI_PROVIDER", providerId: selected.id });
-      setFeedback({ tone: "success", text: "连接测试通过" });
+      setFeedback({ tone: "success", text: "Connection test passed" });
     } catch (error) {
       setFeedback({ tone: "error", text: error instanceof Error ? error.message : String(error) });
     }
@@ -97,16 +97,16 @@ export function SettingsPanel({ settings, setSettings, setStatus }: SettingsPane
     const nextDefault = nextProviders[0]?.id;
     const nextSettings = reorderDefaultProvider({ ...settings, aiProviders: nextProviders, defaultProviderId: nextDefault }, nextDefault ?? "");
     setSelectedId(nextDefault ?? "");
-    await persist(nextSettings, "已移除模型服务");
+    await persist(nextSettings, "Model service removed");
   }
 
   return (
     <section className="panel settings-panel">
       <div className="settings-topline">
         <label>
-          <span>模型服务</span>
+          <span>Model Service</span>
           <select value={selectedId} onChange={(event) => setSelectedId(event.target.value)}>
-            <option value="">未配置</option>
+            <option value="">Not configured</option>
             {settings.aiProviders.map((provider) => (
               <option value={provider.id} key={provider.id}>
                 {provider.name}
@@ -116,14 +116,14 @@ export function SettingsPanel({ settings, setSettings, setStatus }: SettingsPane
         </label>
         <button className="primary" onClick={addProvider} type="button">
           <Plus size={16} />
-          添加模型服务
+          Add Model Service
         </button>
       </div>
 
       {selected ? (
         <div className="compact-form settings-form">
           <label>
-            <span>服务名称</span>
+            <span>Service Name</span>
             <input value={selected.name} onChange={(event) => updateProvider({ name: event.target.value })} />
           </label>
           <label>
@@ -138,18 +138,18 @@ export function SettingsPanel({ settings, setSettings, setStatus }: SettingsPane
                 value={selected.apiKey}
                 onChange={(event) => updateProvider({ apiKey: event.target.value })}
               />
-              <button onClick={() => setShowKey((value) => !value)} type="button" title={showKey ? "隐藏" : "显示"}>
+              <button onClick={() => setShowKey((value) => !value)} type="button" title={showKey ? "Hide" : "Show"}>
                 {showKey ? <EyeOff size={15} /> : <Eye size={15} />}
               </button>
             </div>
           </label>
           <label>
-            <span>模型</span>
+            <span>Model</span>
             <input
               list="model-presets"
               value={selected.model}
               onChange={(event) => updateProvider({ model: event.target.value })}
-              placeholder="例如 mimo-v2.5-pro"
+              placeholder="e.g. mimo-v2.5-pro"
             />
             <datalist id="model-presets">
               <option value="gpt-4.1-mini" />
@@ -168,7 +168,7 @@ export function SettingsPanel({ settings, setSettings, setStatus }: SettingsPane
                   setSettings(next);
                 }}
               />
-              默认使用
+              Use by default
             </label>
             <label>
               <input
@@ -176,17 +176,17 @@ export function SettingsPanel({ settings, setSettings, setStatus }: SettingsPane
                 checked={settings.includeQueryStringsInAi}
                 onChange={(event) => setSettings({ ...settings, includeQueryStringsInAi: event.target.checked })}
               />
-              发送完整 URL
+              Send full URLs
             </label>
           </div>
           <div className="toolbar">
             <button className="primary" onClick={saveSelected} type="button">
               <Save size={16} />
-              保存
+              Save
             </button>
             <button onClick={testSelected} type="button">
               <TestTube2 size={16} />
-              测试
+              Test
             </button>
             <button onClick={removeSelected} type="button">
               <Trash2 size={16} />
@@ -200,7 +200,7 @@ export function SettingsPanel({ settings, setSettings, setStatus }: SettingsPane
           </div>
         </div>
       ) : (
-        <div className="empty-state">还没有配置模型服务</div>
+        <div className="empty-state">No model service configured</div>
       )}
     </section>
   );

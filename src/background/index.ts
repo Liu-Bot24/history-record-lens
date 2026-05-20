@@ -81,10 +81,10 @@ async function getDefaultProvider(providerId?: string): Promise<AiProvider> {
     settings.aiProviders.find((item) => item.isDefault) ??
     settings.aiProviders[0];
 
-  if (!provider) throw new Error("还没有配置模型服务。");
-  if (!provider.apiKey.trim()) throw new Error("当前模型服务缺少 API Key。");
-  if (!provider.baseUrl.trim()) throw new Error("当前模型服务缺少 API Base URL。");
-  if (!provider.model.trim()) throw new Error("当前模型服务缺少模型名称。");
+  if (!provider) throw new Error("No model service is configured.");
+  if (!provider.apiKey.trim()) throw new Error("The current model service is missing an API Key.");
+  if (!provider.baseUrl.trim()) throw new Error("The current model service is missing an API Base URL.");
+  if (!provider.model.trim()) throw new Error("The current model service is missing a model name.");
   return provider;
 }
 
@@ -106,12 +106,12 @@ async function callProvider(provider: AiProvider, query: string, records: Histor
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(`AI 请求失败（${response.status}）：${text.slice(0, 240)}`);
+    throw new Error(`AI request failed (${response.status}): ${text.slice(0, 240)}`);
   }
 
   const json = await response.json();
   const content = json?.choices?.[0]?.message?.content;
-  if (typeof content !== "string") throw new Error("模型服务返回了无法识别的响应。");
+  if (typeof content !== "string") throw new Error("The model service returned an unrecognized response.");
   return parseAiMatches(content);
 }
 
@@ -243,7 +243,7 @@ async function handleMessage(message: BackgroundRequest): Promise<unknown> {
       return message.rules;
     case "GET_ACTIVE_TAB": {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (!tab?.url || !/^https?:\/\//i.test(tab.url)) throw new Error("当前标签页不是可添加的网站。");
+      if (!tab?.url || !/^https?:\/\//i.test(tab.url)) throw new Error("The current tab is not a site that can be added.");
       return { title: tab.title ?? "", url: tab.url };
     }
     case "GET_CLEANUP_LOG":
@@ -262,7 +262,7 @@ async function handleMessage(message: BackgroundRequest): Promise<unknown> {
     case "CLEAN_SITE_RULE": {
       const rules = await getSiteRules();
       const rule = rules.find((item) => item.id === message.ruleId);
-      if (!rule) throw new Error("没有找到这个网站规则。");
+      if (!rule) throw new Error("Could not find this site rule.");
       return cleanupRule(rule, "manual");
     }
     case "AI_QUERY": {

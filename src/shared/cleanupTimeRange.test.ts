@@ -6,7 +6,7 @@ describe("cleanup time ranges", () => {
 
   it("keeps default cleanup unlimited", () => {
     expect(cleanupTimeRangeToFilter({ mode: "all" }, now)).toEqual({});
-    expect(cleanupTimeRangeLabel({ mode: "all" })).toBe("不限");
+    expect(cleanupTimeRangeLabel({ mode: "all" })).toBe("All time");
   });
 
   it("builds quick range filters", () => {
@@ -19,6 +19,6 @@ describe("cleanup time ranges", () => {
     const filter = cleanupTimeRangeToFilter({ mode: "custom", startDate: "2026-05-01", endDate: "2026-05-10" }, now);
     expect(filter.startTime).toBe(new Date("2026-05-01T00:00:00").getTime());
     expect(filter.endTime).toBe(new Date("2026-05-10T23:59:59.999").getTime());
-    expect(cleanupTimeRangeLabel({ mode: "custom", startDate: "2026-05-01", endDate: "2026-05-10" })).toBe("2026-05-01 至 2026-05-10");
+    expect(cleanupTimeRangeLabel({ mode: "custom", startDate: "2026-05-01", endDate: "2026-05-10" })).toBe("2026-05-01 to 2026-05-10");
   });
 });

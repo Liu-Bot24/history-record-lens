@@ -67,7 +67,7 @@ describe("AI helpers", () => {
 
     expect(request.endpoint).toBe("https://api.openai.com/v1/chat/completions");
     expect(request.body.model).toBe("gpt-test");
-    expect(systemPrompt).toContain("不要包含任何解释、分析或多余的文本");
+    expect(systemPrompt).toContain("Do not include explanations, analysis, or extra text");
     expect(request.body.response_format.type).toBe("json_object");
   });
 
@@ -79,19 +79,19 @@ describe("AI helpers", () => {
     });
     const systemPrompt = request.body.messages[0].content;
 
-    expect(systemPrompt).toContain("浏览器历史记录的语义匹配助手");
-    expect(systemPrompt).toContain("语义桥接");
-    expect(systemPrompt).toContain("记忆容错");
-    expect(systemPrompt).toContain("时间容错");
-    expect(systemPrompt).toContain("召回优先");
+    expect(systemPrompt).toContain("semantic matching assistant for browser history");
+    expect(systemPrompt).toContain("semantic bridging");
+    expect(systemPrompt).toContain("Tolerate imperfect memory");
+    expect(systemPrompt).toContain("Tolerate time ambiguity");
+    expect(systemPrompt).toContain("Prefer recall");
     expect(systemPrompt).toContain("currentTime");
-    expect(systemPrompt).toContain("不要因为时间维度的轻微不符而排除语义上高度疑似的记录");
-    expect(systemPrompt).toContain("0.1 到 1.0");
+    expect(systemPrompt).toContain("do not exclude semantically strong candidates because of a minor time mismatch");
+    expect(systemPrompt).toContain("0.1 to 1.0");
     expect(systemPrompt).not.toContain("confidence\":0.0");
   });
 
   it("sends current time context so relative dates can be resolved", () => {
-    const request = buildAiChatRequest(provider, "7 天前看过的字体网站", records, {
+    const request = buildAiChatRequest(provider, "font website I saw 7 days ago", records, {
       includeQueryStrings: true,
       temperature: 0,
       now: new Date("2026-05-10T04:00:00.000Z")
@@ -128,7 +128,7 @@ describe("AI helpers", () => {
 
   it("reports non-JSON model output with a readable snippet", () => {
     expect(() => parseAiMatches("The request was not valid JSON.")).toThrow(AiOutputParseError);
-    expect(() => parseAiMatches("The request was not valid JSON.")).toThrow("模型返回的不是 JSON：The request");
+    expect(() => parseAiMatches("The request was not valid JSON.")).toThrow("Model returned non-JSON output: The request");
   });
 
   it("ranks records by model confidence", () => {
@@ -196,7 +196,7 @@ describe("AI helpers", () => {
     const result = await runBatchedAiMatchResult(
       manyRecords,
       async (batch, batchIndex) => {
-        if (batchIndex === 1) throw new Error("模型返回的不是 JSON：The request was invalid");
+        if (batchIndex === 1) throw new Error("Model returned non-JSON output: The request was invalid");
         return [{ id: batch[0].id, confidence: 0.5 }];
       },
       { continueOnBatchError: true }
@@ -204,7 +204,7 @@ describe("AI helpers", () => {
 
     expect(result.debug.batchReturnedCounts).toEqual([1, 0, 1]);
     expect(result.debug.batchErrors).toEqual([
-      { batchIndex: 1, batchSize: 1000, message: "模型返回的不是 JSON：The request was invalid" }
+      { batchIndex: 1, batchSize: 1000, message: "Model returned non-JSON output: The request was invalid" }
     ]);
     expect(result.matches).toHaveLength(2);
   });
