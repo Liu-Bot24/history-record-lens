@@ -3,12 +3,16 @@ import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { cleanupTimeRangeLabel, cleanupTimeRangeOptions } from "../shared/cleanupTimeRange";
 import { getFaviconUrl, sendToBackground } from "../shared/client";
+import { historyEntryWord, rangeLabelKey } from "../shared/i18n";
+import type { Translator, UiLanguage } from "../shared/i18n";
 import { createPattern, createSiteRule, parseSiteListImport } from "../shared/siteRules";
 import { DEFAULT_SETTINGS } from "../shared/types";
 import type { AppSettings, CleanupLogEntry, CleanupTimeRange, SiteRule } from "../shared/types";
 import { labelFromUrl, normalizeComparableUrl } from "../shared/url";
 
 interface HomePanelProps {
+  language: UiLanguage;
+  t: Translator;
   rules: SiteRule[];
   setRules: (rules: SiteRule[]) => void;
   logs: CleanupLogEntry[];
@@ -18,7 +22,7 @@ interface HomePanelProps {
   setStatus: (status: string) => void;
 }
 
-export function HomePanel({ rules, setRules, logs, setLogs, settings, setSettings, setStatus }: HomePanelProps) {
+export function HomePanel({ language, t, rules, setRules, logs, setLogs, settings, setSettings, setStatus }: HomePanelProps) {
   const [listText, setListText] = useState("");
   const [editingList, setEditingList] = useState(false);
   const [busyRuleId, setBusyRuleId] = useState<string | null>(null);
@@ -52,7 +56,7 @@ export function HomePanel({ rules, setRules, logs, setLogs, settings, setSetting
 
   async function saveTextList(text = listText) {
     const parsedRules = mergeParsedRules(parseSiteListImport(text), rules);
-    await persist(parsedRules, `List saved with ${parsedRules.length} site(s)`);
+    await persist(parsedRules, t("cleanup.listSaved", { count: parsedRules.length }));
     setListText(rulesToListText(parsedRules));
     setEditingList(false);
   }
@@ -71,7 +75,7 @@ export function HomePanel({ rules, setRules, logs, setLogs, settings, setSetting
         cleanupOnTabClose: false
       });
       const nextRules = mergeParsedRules([rule, ...rules], rules);
-      await persist(nextRules, "Current site added");
+      await persist(nextRules, t("cleanup.currentSiteAdded"));
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
     }
@@ -82,7 +86,10 @@ export function HomePanel({ rules, setRules, logs, setLogs, settings, setSetting
   }
 
   async function updateCleanupTimeRange(range: CleanupTimeRange) {
-    await persistSettings({ ...settings, cleanupTimeRange: range }, `Cleanup range: ${cleanupTimeRangeLabel(range)}`);
+    await persistSettings(
+      { ...settings, cleanupTimeRange: range },
+      t("cleanup.rangeStatus", { range: cleanupTimeRangeLabel(range, language) })
+    );
   }
 
   async function toggleAutoCleanupForCleanupRules() {
@@ -94,12 +101,12 @@ export function HomePanel({ rules, setRules, logs, setLogs, settings, setSetting
           ? { ...rule, cleanupOnTabClose: rule.cleanupEnabled ? nextValue : false, updatedAt: Date.now() }
           : rule
       ),
-      nextValue ? "Auto cleanup enabled" : "Auto cleanup disabled"
+      nextValue ? t("cleanup.autoEnabled") : t("cleanup.autoDisabled")
     );
   }
 
   async function removeRule(ruleId: string) {
-    await persist(rules.filter((rule) => rule.id !== ruleId), "Removed from list");
+    await persist(rules.filter((rule) => rule.id !== ruleId), t("cleanup.removed"));
   }
 
   async function openRule(rule: SiteRule) {
@@ -110,7 +117,7 @@ export function HomePanel({ rules, setRules, logs, setLogs, settings, setSetting
     setBusyRuleId(rule.id);
     try {
       const result = await sendToBackground({ type: "CLEAN_SITE_RULE", ruleId: rule.id });
-      setStatus(`Deleted ${result.deletedCount} URL history entr${result.deletedCount === 1 ? "y" : "ies"}`);
+      setStatus(t("history.deleted", { count: result.deletedCount, entry: historyEntryWord(language, result.deletedCount) }));
       setLogs(await sendToBackground({ type: "GET_CLEANUP_LOG" }));
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
@@ -121,7 +128,7 @@ export function HomePanel({ rules, setRules, logs, setLogs, settings, setSetting
 
   async function cleanAllEnabled() {
     if (!cleanupRules.length) {
-      setStatus("No sites are in the cleanup list yet");
+      setStatus(t("cleanup.noSites"));
       return;
     }
     let deletedCount = 0;
@@ -131,7 +138,11 @@ export function HomePanel({ rules, setRules, logs, setLogs, settings, setSetting
         const result = await sendToBackground({ type: "CLEAN_SITE_RULE", ruleId: rule.id });
         deletedCount += result.deletedCount;
       }
-      setStatus(`Cleaned ${cleanupRules.length} site(s), deleting ${deletedCount} URL history entr${deletedCount === 1 ? "y" : "ies"}`);
+      setStatus(t("cleanup.cleanedAll", {
+        siteCount: cleanupRules.length,
+        deletedCount,
+        entry: historyEntryWord(language, deletedCount)
+      }));
       setLogs(await sendToBackground({ type: "GET_CLEANUP_LOG" }));
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
@@ -145,18 +156,18 @@ export function HomePanel({ rules, setRules, logs, setLogs, settings, setSetting
       <section className="command-bar">
         <button className="primary" onClick={cleanAllEnabled} disabled={!cleanupRules.length || busyRuleId === "all"} type="button">
           <ShieldCheck size={16} />
-          One-Click Cleanup
+          {t("cleanup.oneClick")}
         </button>
         <button onClick={addCurrentSite} type="button">
           <ListPlus size={16} />
-          Add Current Site
+          {t("cleanup.addCurrentSite")}
         </button>
         <label
           className={autoCleanupEnabled ? "switch-control with-tooltip is-on" : "switch-control with-tooltip"}
-          data-tooltip="Clean matching history after a site closes"
-          aria-label="Clean matching history after a site closes"
+          data-tooltip={t("cleanup.autoTooltip")}
+          aria-label={t("cleanup.autoTooltip")}
         >
-          <span>Auto</span>
+          <span>{t("cleanup.auto")}</span>
           <input
             checked={autoCleanupEnabled}
             disabled={!cleanupRules.length}
@@ -170,9 +181,10 @@ export function HomePanel({ rules, setRules, logs, setLogs, settings, setSetting
       </section>
 
       <FoldSection
-        title="Quick Access"
+        title={t("cleanup.quickAccess")}
         open={openSections.quick}
         onToggle={() => setOpenSections((value) => ({ ...value, quick: !value.quick }))}
+        t={t}
       >
         {quickRules.length ? (
           <div className="quick-tile-grid">
@@ -184,21 +196,22 @@ export function HomePanel({ rules, setRules, logs, setLogs, settings, setSetting
             ))}
           </div>
         ) : (
-          <div className="empty-line">Starred sites will appear here.</div>
+          <div className="empty-line">{t("cleanup.starredHint")}</div>
         )}
       </FoldSection>
 
       <FoldSection
         className="site-rules-section"
-        title="Website List"
+        title={t("cleanup.websiteList")}
         open={openSections.list}
         onToggle={() => setOpenSections((value) => ({ ...value, list: !value.list }))}
+        t={t}
         action={
           <button
             className={listMode === "edit" ? "section-action with-tooltip is-on" : "section-action with-tooltip"}
-            title={listMode === "edit" ? "Done editing" : "Edit list"}
-            data-tooltip={listMode === "edit" ? "Save list" : "Edit list"}
-            aria-label={listMode === "edit" ? "Done editing" : "Edit list"}
+            title={listMode === "edit" ? t("cleanup.doneEditing") : t("cleanup.editList")}
+            data-tooltip={listMode === "edit" ? t("cleanup.saveList") : t("cleanup.editList")}
+            aria-label={listMode === "edit" ? t("cleanup.doneEditing") : t("cleanup.editList")}
             onClick={async (event) => {
               event.stopPropagation();
               setOpenSections((value) => ({ ...value, list: true }));
@@ -219,7 +232,7 @@ export function HomePanel({ rules, setRules, logs, setLogs, settings, setSetting
       >
         {listMode === "edit" ? (
           <div className="list-editor">
-            <p>Format: Name, quick access URL, cleanup domain 1, cleanup domain 2. Use one site per line.</p>
+            <p>{t("cleanup.formatHint")}</p>
             <textarea
               autoFocus
               value={listText}
@@ -235,7 +248,7 @@ export function HomePanel({ rules, setRules, logs, setLogs, settings, setSetting
           <div className="history-like-list">
             {rules.map((rule) => (
               <article className="history-like-row" key={rule.id}>
-                <button className="history-like-link" onClick={() => openRule(rule)} title="Open site" type="button">
+                <button className="history-like-link" onClick={() => openRule(rule)} title={t("cleanup.openSite")} type="button">
                   <SiteIcon rule={rule} />
                   <span className="history-like-main">
                     <span className="row-title">{rule.name}</span>
@@ -244,9 +257,9 @@ export function HomePanel({ rules, setRules, logs, setLogs, settings, setSetting
                 </button>
                 <button
                   className={rule.quickAccess ? "row-toggle with-tooltip is-on" : "row-toggle with-tooltip"}
-                  title={rule.quickAccess ? "Shown in Quick Access" : "Show in Quick Access"}
-                  data-tooltip={rule.quickAccess ? "Remove from Quick Access" : "Add to Quick Access"}
-                  aria-label={rule.quickAccess ? "Shown in Quick Access" : "Show in Quick Access"}
+                  title={rule.quickAccess ? t("cleanup.shownQuickAccess") : t("cleanup.showQuickAccess")}
+                  data-tooltip={rule.quickAccess ? t("cleanup.removeQuickAccess") : t("cleanup.addQuickAccess")}
+                  aria-label={rule.quickAccess ? t("cleanup.shownQuickAccess") : t("cleanup.showQuickAccess")}
                   onClick={() => updateRule({ ...rule, quickAccess: !rule.quickAccess })}
                   type="button"
                 >
@@ -254,9 +267,9 @@ export function HomePanel({ rules, setRules, logs, setLogs, settings, setSetting
                 </button>
                 <button
                   className={rule.cleanupEnabled ? "row-toggle with-tooltip is-on" : "row-toggle with-tooltip"}
-                  title={rule.cleanupEnabled ? "Included in One-Click Cleanup" : "Include in One-Click Cleanup"}
-                  data-tooltip={rule.cleanupEnabled ? "Remove from cleanup" : "Add to cleanup"}
-                  aria-label={rule.cleanupEnabled ? "Included in One-Click Cleanup" : "Include in One-Click Cleanup"}
+                  title={rule.cleanupEnabled ? t("cleanup.includedOneClick") : t("cleanup.includeOneClick")}
+                  data-tooltip={rule.cleanupEnabled ? t("cleanup.removeFromCleanup") : t("cleanup.addToCleanup")}
+                  aria-label={rule.cleanupEnabled ? t("cleanup.includedOneClick") : t("cleanup.includeOneClick")}
                   onClick={() =>
                     updateRule({
                       ...rule,
@@ -270,64 +283,65 @@ export function HomePanel({ rules, setRules, logs, setLogs, settings, setSetting
                 </button>
                 <button
                   className="row-icon-button with-tooltip"
-                  title="Clean history now"
-                  data-tooltip="Clean now"
+                  title={t("cleanup.cleanHistoryNow")}
+                  data-tooltip={t("cleanup.cleanNow")}
                   onClick={() => cleanRule(rule)}
                   disabled={busyRuleId === rule.id}
                   type="button"
                 >
                   <Eraser size={14} />
                 </button>
-                <button className="row-icon-button with-tooltip" title="Delete" data-tooltip="Delete" onClick={() => removeRule(rule.id)} type="button">
+                <button className="row-icon-button with-tooltip" title={t("common.delete")} data-tooltip={t("common.delete")} onClick={() => removeRule(rule.id)} type="button">
                   <Trash2 size={14} />
                 </button>
               </article>
             ))}
           </div>
         ) : (
-          <div className="empty-line">No sites yet. Write a list or add the current site.</div>
+          <div className="empty-line">{t("cleanup.emptyList")}</div>
         )}
       </FoldSection>
 
       <FoldSection
         className="time-range-section"
-        title="Cleanup Time Range"
-        meta={cleanupTimeRangeLabel(cleanupTimeRange)}
+        title={t("cleanup.timeRange")}
+        meta={cleanupTimeRangeLabel(cleanupTimeRange, language)}
         open={openSections.time}
         onToggle={() => setOpenSections((value) => ({ ...value, time: !value.time }))}
+        t={t}
       >
         <div className="time-range-panel">
-          <div className="range-options" role="group" aria-label="Cleanup time range">
+          <div className="range-options" role="group" aria-label={t("cleanup.timeRangeAria")}>
             {cleanupTimeRangeOptions.map((option) => (
               <button
                 className={cleanupTimeRange.mode === option.mode ? "range-option is-active" : "range-option"}
                 key={option.mode}
                 onClick={() => updateCleanupTimeRange({ ...cleanupTimeRange, mode: option.mode })}
-                type="button"
-              >
-                {option.label}
+              type="button"
+            >
+                {t(rangeLabelKey(option.mode))}
               </button>
             ))}
           </div>
           {cleanupTimeRange.mode === "custom" ? (
             <div className="date-range-row">
               <label>
-                <span>Start date</span>
+                <span>{t("common.startDate")}</span>
                 <input
                   inputMode="numeric"
                   pattern="\d{4}-\d{2}-\d{2}"
-                  placeholder="YYYY-MM-DD"
+                  placeholder={t("common.datePlaceholder")}
                   type="text"
                   value={cleanupTimeRange.startDate ?? ""}
                   onChange={(event) => updateCleanupTimeRange({ ...cleanupTimeRange, startDate: event.target.value })}
                 />
               </label>
               <label>
-                <span>End date</span>
+                <span>{t("common.endDate")}</span>
                 <input
                   inputMode="numeric"
                   pattern="\d{4}-\d{2}-\d{2}"
-                  placeholder="YYYY-MM-DD"
+                  placeholder={t("common.datePlaceholder")}
                   type="text"
                   value={cleanupTimeRange.endDate ?? ""}
                   onChange={(event) => updateCleanupTimeRange({ ...cleanupTimeRange, endDate: event.target.value })}
@@ -350,6 +364,7 @@ function FoldSection({
   onToggle,
   action,
   right,
+  t,
   children
 }: {
   className?: string;
@@ -359,6 +374,7 @@ function FoldSection({
   onToggle: () => void;
   action?: ReactNode;
   right?: ReactNode;
+  t: Translator;
   children: ReactNode;
 }) {
   return (
@@ -368,7 +384,7 @@ function FoldSection({
         {action}
         {right ? <div className="fold-right">{right}</div> : null}
         {meta ? <small>{meta}</small> : null}
-        <button className="fold-toggle" onClick={onToggle} type="button" title={open ? "Collapse" : "Expand"}>
+        <button className="fold-toggle" onClick={onToggle} type="button" title={open ? t("common.collapse") : t("common.expand")}>
           {open ? <ChevronUp size={17} /> : <ChevronDown size={17} />}
         </button>
       </div>

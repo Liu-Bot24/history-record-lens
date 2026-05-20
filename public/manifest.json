@@ -1,8 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "History Record Lens - AI History Search | One-Click Cleanup",
-  "short_name": "History Lens",
-  "description": "Find Chrome browsing history with AI, maintain website lists, and clean local history with one click.",
+  "name": "__MSG_extName__",
+  "short_name": "__MSG_extShortName__",
+  "description": "__MSG_extDescription__",
+  "default_locale": "en",
   "version": "1.0.2",
   "minimum_chrome_version": "116",
   "permissions": ["history", "storage", "tabs", "sidePanel", "favicon"],
@@ -18,7 +19,7 @@
     "128": "icons/icon128.png"
   },
   "action": {
-    "default_title": "Open History Record Lens",
+    "default_title": "__MSG_extActionTitle__",
     "default_icon": {
       "16": "icons/icon16.png",
       "32": "icons/icon32.png",

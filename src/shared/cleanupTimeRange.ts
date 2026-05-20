@@ -1,4 +1,6 @@
 import type { CleanupTimeRange, HistoryFilter } from "./types";
+import { createTranslator, rangeLabelKey } from "./i18n";
+import type { UiLanguage } from "./i18n";
 
 export const cleanupTimeRangeOptions: Array<{ mode: CleanupTimeRange["mode"]; label: string }> = [
   { mode: "all", label: "All time" },
@@ -22,11 +24,11 @@ export function cleanupTimeRangeToFilter(range: CleanupTimeRange, now = Date.now
   };
 }
 
-export function cleanupTimeRangeLabel(range: CleanupTimeRange): string {
-  const option = cleanupTimeRangeOptions.find((item) => item.mode === range.mode);
-  if (range.mode !== "custom") return option?.label ?? "All time";
-  if (range.startDate && range.endDate) return `${range.startDate} to ${range.endDate}`;
-  if (range.startDate) return `From ${range.startDate}`;
-  if (range.endDate) return `Before ${range.endDate}`;
-  return "Custom range";
+export function cleanupTimeRangeLabel(range: CleanupTimeRange, language: UiLanguage = "en"): string {
+  const t = createTranslator(language);
+  if (range.mode !== "custom") return t(rangeLabelKey(range.mode));
+  if (range.startDate && range.endDate) return t("range.to", { start: range.startDate, end: range.endDate });
+  if (range.startDate) return t("range.from", { date: range.startDate });
+  if (range.endDate) return t("range.before", { date: range.endDate });
+  return t("range.custom");
 }

@@ -1,16 +1,18 @@
 import { Eye, EyeOff, Plus, Save, TestTube2, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { ensureApiHostPermission, reorderDefaultProvider, sendToBackground } from "../shared/client";
+import type { Translator } from "../shared/i18n";
 import { newId } from "../shared/siteRules";
 import type { AiProvider, AppSettings } from "../shared/types";
 
 interface SettingsPanelProps {
+  t: Translator;
   settings: AppSettings;
   setSettings: (settings: AppSettings) => void;
   setStatus: (status: string) => void;
 }
 
-export function SettingsPanel({ settings, setSettings, setStatus }: SettingsPanelProps) {
+export function SettingsPanel({ t, settings, setSettings, setStatus }: SettingsPanelProps) {
   const [selectedId, setSelectedId] = useState(settings.defaultProviderId ?? settings.aiProviders[0]?.id ?? "");
   const [showKey, setShowKey] = useState(false);
   const [feedback, setFeedback] = useState<{ tone: "success" | "error" | "neutral"; text: string } | null>(null);
@@ -24,7 +26,7 @@ export function SettingsPanel({ settings, setSettings, setStatus }: SettingsPane
     [settings.aiProviders, selectedId]
   );
 
-  async function persist(nextSettings: AppSettings, feedbackText = "Settings saved") {
+  async function persist(nextSettings: AppSettings, feedbackText = t("settings.settingsSaved")) {
     setSettings(nextSettings);
     await sendToBackground({ type: "SAVE_SETTINGS", settings: nextSettings });
     setStatus("");
@@ -34,7 +36,7 @@ export function SettingsPanel({ settings, setSettings, setStatus }: SettingsPane
   async function addProvider() {
     const provider: AiProvider = {
       id: newId("provider"),
-      name: "Custom API",
+      name: t("settings.customApi"),
       baseUrl: "https://api.openai.com/v1",
       apiKey: "",
       model: "gpt-4.1-mini",
@@ -47,7 +49,7 @@ export function SettingsPanel({ settings, setSettings, setStatus }: SettingsPane
       aiProviders: [provider, ...settings.aiProviders]
     };
     setSelectedId(provider.id);
-    await persist(nextSettings, "Model service added");
+    await persist(nextSettings, t("settings.modelServiceAdded"));
   }
 
   async function updateProvider(patch: Partial<AiProvider>) {
@@ -65,7 +67,7 @@ export function SettingsPanel({ settings, setSettings, setStatus }: SettingsPane
     const nextSettings = selected.isDefault ? reorderDefaultProvider(settings, selected.id) : settings;
     const allowed = await ensureApiHostPermission(nextSettings, selected.id);
     if (!allowed) {
-      setFeedback({ tone: "error", text: "API domain access was not granted" });
+      setFeedback({ tone: "error", text: t("ai.apiAccessDenied") });
       return null;
     }
     return nextSettings;
@@ -74,7 +76,7 @@ export function SettingsPanel({ settings, setSettings, setStatus }: SettingsPane
   async function saveSelected() {
     const nextSettings = await prepareSelectedSettings();
     if (!nextSettings) return;
-    await persist(nextSettings, "Settings saved");
+    await persist(nextSettings, t("settings.settingsSaved"));
   }
 
   async function testSelected() {
@@ -82,10 +84,10 @@ export function SettingsPanel({ settings, setSettings, setStatus }: SettingsPane
     const nextSettings = await prepareSelectedSettings();
     if (!nextSettings) return;
     await persist(nextSettings, "");
-    setFeedback({ tone: "neutral", text: "Testing connection..." });
+    setFeedback({ tone: "neutral", text: t("ai.testingConnection") });
     try {
       await sendToBackground({ type: "TEST_AI_PROVIDER", providerId: selected.id });
-      setFeedback({ tone: "success", text: "Connection test passed" });
+      setFeedback({ tone: "success", text: t("ai.connectionPassed") });
     } catch (error) {
       setFeedback({ tone: "error", text: error instanceof Error ? error.message : String(error) });
     }
@@ -97,16 +99,16 @@ export function SettingsPanel({ settings, setSettings, setStatus }: SettingsPane
     const nextDefault = nextProviders[0]?.id;
     const nextSettings = reorderDefaultProvider({ ...settings, aiProviders: nextProviders, defaultProviderId: nextDefault }, nextDefault ?? "");
     setSelectedId(nextDefault ?? "");
-    await persist(nextSettings, "Model service removed");
+    await persist(nextSettings, t("settings.modelServiceRemoved"));
   }
 
   return (
     <section className="panel settings-panel">
       <div className="settings-topline">
         <label>
-          <span>Model Service</span>
+          <span>{t("settings.title")}</span>
           <select value={selectedId} onChange={(event) => setSelectedId(event.target.value)}>
-            <option value="">Not configured</option>
+            <option value="">{t("ai.notConfigured")}</option>
             {settings.aiProviders.map((provider) => (
               <option value={provider.id} key={provider.id}>
                 {provider.name}
@@ -116,14 +118,14 @@ export function SettingsPanel({ settings, setSettings, setStatus }: SettingsPane
         </label>
         <button className="primary" onClick={addProvider} type="button">
           <Plus size={16} />
-          Add Model Service
+          {t("settings.addModelService")}
         </button>
       </div>
 
       {selected ? (
         <div className="compact-form settings-form">
           <label>
-            <span>Service Name</span>
+            <span>{t("settings.serviceName")}</span>
             <input value={selected.name} onChange={(event) => updateProvider({ name: event.target.value })} />
           </label>
           <label>
@@ -138,18 +140,18 @@ export function SettingsPanel({ settings, setSettings, setStatus }: SettingsPane
                 value={selected.apiKey}
                 onChange={(event) => updateProvider({ apiKey: event.target.value })}
               />
-              <button onClick={() => setShowKey((value) => !value)} type="button" title={showKey ? "Hide" : "Show"}>
+              <button onClick={() => setShowKey((value) => !value)} type="button" title={showKey ? t("common.hide") : t("common.show")}>
                 {showKey ? <EyeOff size={15} /> : <Eye size={15} />}
               </button>
             </div>
           </label>
           <label>
-            <span>Model</span>
+            <span>{t("settings.model")}</span>
             <input
               list="model-presets"
               value={selected.model}
               onChange={(event) => updateProvider({ model: event.target.value })}
-              placeholder="e.g. mimo-v2.5-pro"
+              placeholder={t("settings.modelPlaceholder")}
             />
             <datalist id="model-presets">
               <option value="gpt-4.1-mini" />
@@ -168,7 +170,7 @@ export function SettingsPanel({ settings, setSettings, setStatus }: SettingsPane
                   setSettings(next);
                 }}
               />
-              Use by default
+              {t("settings.useByDefault")}
             </label>
             <label>
               <input
@@ -176,17 +178,17 @@ export function SettingsPanel({ settings, setSettings, setStatus }: SettingsPane
                 checked={settings.includeQueryStringsInAi}
                 onChange={(event) => setSettings({ ...settings, includeQueryStringsInAi: event.target.checked })}
               />
-              Send full URLs
+              {t("settings.sendFullUrls")}
             </label>
           </div>
           <div className="toolbar">
             <button className="primary" onClick={saveSelected} type="button">
               <Save size={16} />
-              Save
+              {t("common.save")}
             </button>
             <button onClick={testSelected} type="button">
               <TestTube2 size={16} />
-              Test
+              {t("common.test")}
             </button>
             <button onClick={removeSelected} type="button">
               <Trash2 size={16} />
@@ -200,7 +202,7 @@ export function SettingsPanel({ settings, setSettings, setStatus }: SettingsPane
           </div>
         </div>
       ) : (
-        <div className="empty-state">No model service configured</div>
+        <div className="empty-state">{t("settings.noModelService")}</div>
       )}
     </section>
   );

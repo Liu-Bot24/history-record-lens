@@ -1,0 +1,14 @@
+{
+  "extName": {
+    "message": "History Record Lens - AI History Search | One-Click Cleanup"
+  },
+  "extShortName": {
+    "message": "History Lens"
+  },
+  "extDescription": {
+    "message": "Find Chrome browsing history with AI, maintain website lists, and clean local history with one click."
+  },
+  "extActionTitle": {
+    "message": "Open History Record Lens"
+  }
+}

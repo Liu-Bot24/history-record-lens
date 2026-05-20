@@ -33,6 +33,8 @@
   --tooltip-line: #cbd5e1;
   --tooltip-bg: #ffffff;
   --switch-track-bg: #e2e8f0;
+  --language-active-bg: #eef3f8;
+  --language-active-text: #0f172a;
   --enabled-line: #7ccbd8;
   --enabled-bg: #e4f8fb;
   --success-text: #15803d;
@@ -79,6 +81,8 @@
     --tooltip-line: #334157;
     --tooltip-bg: #172033;
     --switch-track-bg: #1d2635;
+    --language-active-bg: #22d3ee;
+    --language-active-text: #06121a;
     --enabled-line: #247486;
     --enabled-bg: #102231;
     --success-text: #86efac;
@@ -201,8 +205,13 @@ main {
 .topbar {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
+  gap: 10px;
   margin-bottom: 8px;
+}
+
+.topbar-copy {
+  min-width: 0;
 }
 
 .title-line {
@@ -242,6 +251,39 @@ main {
   margin: 3px 0 0;
   color: var(--muted);
   font-size: 12px;
+}
+
+.language-toggle {
+  flex: 0 0 auto;
+  display: inline-grid;
+  grid-template-columns: repeat(2, minmax(42px, 1fr));
+  gap: 0;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--input-bg);
+  padding: 3px;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 3%);
+}
+
+.language-toggle button {
+  min-height: 28px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  padding: 3px 10px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.language-toggle button:hover {
+  background: var(--button-hover);
+  color: var(--text);
+}
+
+.language-toggle button.is-active {
+  background: var(--language-active-bg);
+  color: var(--language-active-text);
 }
 
 .tabs {

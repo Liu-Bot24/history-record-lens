@@ -1,6 +1,8 @@
 import { ExternalLink, RotateCcw, Search, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { sendToBackground } from "../shared/client";
+import { formatHistoryTime, historyEntryWord } from "../shared/i18n";
+import type { Translator, UiLanguage } from "../shared/i18n";
 import {
   pruneHistorySelection,
   selectAllHistory,
@@ -12,10 +14,12 @@ import type { HistoryFilter, HistoryRecord } from "../shared/types";
 import { cleanUrlPattern, extractHost } from "../shared/url";
 
 interface HistoryPanelProps {
+  language: UiLanguage;
+  t: Translator;
   setStatus: (status: string) => void;
 }
 
-export function HistoryPanel({ setStatus }: HistoryPanelProps) {
+export function HistoryPanel({ language, t, setStatus }: HistoryPanelProps) {
   const [filter, setFilter] = useHistoryFilter();
   const [records, setRecords] = useState<HistoryRecord[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -31,7 +35,7 @@ export function HistoryPanel({ setStatus }: HistoryPanelProps) {
       const nextRecords = await sendToBackground({ type: "SEARCH_HISTORY", filter });
       setRecords(nextRecords);
       setSelected(new Set());
-      setStatus(`Found ${nextRecords.length} history record(s)`);
+      setStatus(t("history.found", { count: nextRecords.length }));
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
     } finally {
@@ -44,7 +48,7 @@ export function HistoryPanel({ setStatus }: HistoryPanelProps) {
     setLoading(true);
     try {
       const result = await sendToBackground({ type: "DELETE_URLS", urls });
-      setStatus(`Deleted ${result.deletedCount} URL history entr${result.deletedCount === 1 ? "y" : "ies"}`);
+      setStatus(t("history.deleted", { count: result.deletedCount, entry: historyEntryWord(language, result.deletedCount) }));
       await runSearch();
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
@@ -58,7 +62,7 @@ export function HistoryPanel({ setStatus }: HistoryPanelProps) {
     setLoading(true);
     try {
       await Promise.all(urls.map((url) => sendToBackground({ type: "OPEN_URL", url })));
-      setStatus(`Opened ${urls.length} history record(s)`);
+      setStatus(t("history.opened", { count: urls.length }));
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
     } finally {
@@ -71,21 +75,22 @@ export function HistoryPanel({ setStatus }: HistoryPanelProps) {
       <div className="history-command-form">
         <div className="history-search-row">
           <label>
-            <span>Keywords</span>
+            <span>{t("history.keywords")}</span>
             <input value={filter.text ?? ""} onChange={(event) => setFilter((item) => ({ ...item, text: event.target.value }))} />
           </label>
           <button className="primary" onClick={runSearch} disabled={loading} type="button">
             <Search size={15} />
-            Search
+            {t("history.search")}
           </button>
           <button onClick={() => setFilterOpen((value) => !value)} type="button">
-            Filters
+            {t("history.filters")}
           </button>
         </div>
-        {filterOpen ? <FilterGrid filter={filter} setFilter={setFilter} includeText={false} compact /> : null}
+        {filterOpen ? <FilterGrid t={t} filter={filter} setFilter={setFilter} includeText={false} compact /> : null}
       </div>
       <div className="toolbar compact-toolbar">
         <HistoryBulkActions
+          t={t}
           records={records}
           selected={selected}
           setSelected={setSelected}
@@ -99,18 +104,19 @@ export function HistoryPanel({ setStatus }: HistoryPanelProps) {
           type="button"
         >
           <Trash2 size={16} />
-          Delete current results
+          {t("history.deleteCurrentResults")}
         </button>
-        <button onClick={() => setRecords([])} disabled={loading} type="button" title="Clear results">
+        <button onClick={() => setRecords([])} disabled={loading} type="button" title={t("history.clearResults")}>
           <RotateCcw size={16} />
         </button>
       </div>
-      <HistoryList records={records} selected={selected} setSelected={setSelected} setStatus={setStatus} />
+      <HistoryList language={language} t={t} records={records} selected={selected} setSelected={setSelected} setStatus={setStatus} />
     </section>
   );
 }
 
 export function HistoryBulkActions({
+  t,
   records,
   selected,
   setSelected,
@@ -118,6 +124,7 @@ export function HistoryBulkActions({
   onOpenSelected,
   onDeleteSelected
 }: {
+  t: Translator;
   records: HistoryRecord[];
   selected: Set<string>;
   setSelected: React.Dispatch<React.SetStateAction<Set<string>>>;
@@ -132,17 +139,17 @@ export function HistoryBulkActions({
 
   return (
     <div className="history-bulk-actions" data-history-bulk-actions="true">
-      <span>{selectedCount} selected</span>
+      <span>{t("history.selected", { count: selectedCount })}</span>
       <button onClick={() => setSelected(allVisibleSelected ? new Set() : selectAllHistory(records))} disabled={loading} type="button">
-        {allVisibleSelected ? "Deselect all" : "Select all"}
+        {allVisibleSelected ? t("history.deselectAll") : t("history.selectAll")}
       </button>
       <button onClick={() => void onOpenSelected()} disabled={loading} type="button">
         <ExternalLink size={14} />
-        Open selected
+        {t("history.openSelected")}
       </button>
       <button onClick={() => void onDeleteSelected()} disabled={loading} type="button">
         <Trash2 size={14} />
-        Delete selected
+        {t("history.deleteSelected")}
       </button>
     </div>
   );
@@ -154,11 +161,13 @@ export function useHistoryFilter() {
 }
 
 export function FilterGrid({
+  t,
   filter,
   setFilter,
   includeText = true,
   compact = false
 }: {
+  t: Translator;
   filter: HistoryFilter;
   setFilter: React.Dispatch<React.SetStateAction<HistoryFilter>>;
   includeText?: boolean;
@@ -168,12 +177,12 @@ export function FilterGrid({
     <div className={compact ? "filter-grid is-compact" : "filter-grid"}>
       {includeText ? (
         <label>
-            <span>Keywords</span>
+            <span>{t("history.keywords")}</span>
           <input value={filter.text ?? ""} onChange={(event) => setFilter((item) => ({ ...item, text: event.target.value }))} />
         </label>
       ) : null}
       <label>
-          <span>Domain</span>
+          <span>{t("history.domain")}</span>
         <input
           value={filter.domain ?? ""}
           onChange={(event) => setFilter((item) => ({ ...item, domain: event.target.value }))}
@@ -182,7 +191,7 @@ export function FilterGrid({
         />
       </label>
       <label>
-          <span>URL contains</span>
+          <span>{t("history.urlContains")}</span>
         <input
           value={filter.url ?? ""}
           onChange={(event) => setFilter((item) => ({ ...item, url: event.target.value }))}
@@ -191,7 +200,7 @@ export function FilterGrid({
         />
       </label>
       <label>
-          <span>Start time</span>
+          <span>{t("history.startTime")}</span>
         <input
           type="datetime-local"
           onChange={(event) =>
@@ -203,7 +212,7 @@ export function FilterGrid({
         />
       </label>
       <label>
-          <span>End time</span>
+          <span>{t("history.endTime")}</span>
         <input
           type="datetime-local"
           onChange={(event) =>
@@ -215,7 +224,7 @@ export function FilterGrid({
         />
       </label>
       <label>
-          <span>Max results</span>
+          <span>{t("history.maxResults")}</span>
         <input
           type="number"
           min="0"
@@ -231,11 +240,15 @@ export function HistoryList({
   records,
   selected,
   setSelected,
+  language,
+  t,
   setStatus
 }: {
   records: HistoryRecord[];
   selected?: Set<string>;
   setSelected?: React.Dispatch<React.SetStateAction<Set<string>>>;
+  language: UiLanguage;
+  t: Translator;
   setStatus: (status: string) => void;
 }) {
   async function openUrl(url: string) {
@@ -246,7 +259,7 @@ export function HistoryList({
     }
   }
 
-  if (!records.length) return <div className="empty-state">No history records</div>;
+  if (!records.length) return <div className="empty-state">{t("history.noRecords")}</div>;
 
   return (
     <div className="history-list">
@@ -265,16 +278,16 @@ export function HistoryList({
                 }
               />
             ) : null}
-            <button className="icon-button" onClick={() => openUrl(record.url)} type="button" title="Open">
+            <button className="icon-button" onClick={() => openUrl(record.url)} type="button" title={t("common.open")}>
               <ExternalLink size={15} />
             </button>
             <div className="record-main">
               <h3>{record.title || record.url}</h3>
               <p>{record.url}</p>
               <div className="meta-line">
-                <span>{formatTime(record.lastVisitTime)}</span>
-                <span>{record.visitCount} visit{record.visitCount === 1 ? "" : "s"}</span>
-                <span>{record.typedCount} typed visit{record.typedCount === 1 ? "" : "s"}</span>
+                <span>{formatHistoryTime(language, record.lastVisitTime)}</span>
+                <span>{t("history.visitCount", { count: record.visitCount, unit: record.visitCount === 1 ? "visit" : "visits" })}</span>
+                <span>{t("history.typedCount", { count: record.typedCount, unit: record.typedCount === 1 ? "typed visit" : "typed visits" })}</span>
               </div>
             </div>
           </article>
@@ -282,14 +295,4 @@ export function HistoryList({
       })}
     </div>
   );
-}
-
-function formatTime(time: number) {
-  if (!time) return "Unknown time";
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit"
-  }).format(time);
 }

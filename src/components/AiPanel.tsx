@@ -3,6 +3,8 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { cleanupTimeRangeToFilter } from "../shared/cleanupTimeRange";
 import { ensureApiHostPermission, reorderDefaultProvider, sendToBackground } from "../shared/client";
 import { pruneHistorySelection, selectedHistoryUrls } from "../shared/historySelection";
+import { historyEntryWord, rangeLabelKey } from "../shared/i18n";
+import type { Translator, UiLanguage } from "../shared/i18n";
 import { loadSortByConfidencePreference, saveSortByConfidencePreference } from "../shared/localPreferences";
 import { newId } from "../shared/siteRules";
 import { formatAiQueryFailureStatus } from "../shared/statusMessages";
@@ -10,30 +12,29 @@ import type { AiProvider, AppSettings, CleanupTimeRange, HistoryFilter, HistoryR
 import { HistoryBulkActions, HistoryList } from "./HistoryPanel";
 
 interface AiPanelProps {
+  language: UiLanguage;
+  t: Translator;
   settings: AppSettings;
   setSettings: (settings: AppSettings) => void;
   setStatus: (status: string) => void;
 }
 
-const timeRangeOptions: Array<{ mode: CleanupTimeRange["mode"]; label: string }> = [
-  { mode: "all", label: "All time" },
-  { mode: "hour", label: "Past hour" },
-  { mode: "day", label: "Past day" },
-  { mode: "week", label: "Past week" }
-];
+const timeRangeModes: Array<CleanupTimeRange["mode"]> = ["all", "hour", "day", "week"];
 
-const defaultProviderDraft: AiProvider = {
-  id: "draft",
-  name: "Model Service",
-  baseUrl: "",
-  apiKey: "",
-  model: "",
-  enabled: true,
-  isDefault: true
-};
+function createDefaultProviderDraft(t: Translator): AiProvider {
+  return {
+    id: "draft",
+    name: t("ai.modelService"),
+    baseUrl: "",
+    apiKey: "",
+    model: "",
+    enabled: true,
+    isDefault: true
+  };
+}
 
-function modelLabel(provider: AiProvider | undefined): string {
-  return provider?.model.trim() || provider?.name.trim() || "Not configured";
+function modelLabel(provider: AiProvider | undefined, t: Translator): string {
+  return provider?.model.trim() || provider?.name.trim() || t("ai.notConfigured");
 }
 
 function cssPixelValue(value: string): number {
@@ -107,7 +108,7 @@ function useHistoryTitleLayout(selectedCount: number, recordCount: number) {
   return { ref, stacked };
 }
 
-export function AiPanel({ settings, setSettings, setStatus }: AiPanelProps) {
+export function AiPanel({ language, t, settings, setSettings, setStatus }: AiPanelProps) {
   const selectedProvider = useMemo(
     () =>
       settings.aiProviders.find((provider) => provider.id === settings.defaultProviderId) ??
@@ -116,7 +117,7 @@ export function AiPanel({ settings, setSettings, setStatus }: AiPanelProps) {
     [settings.aiProviders, settings.defaultProviderId]
   );
   const [editingProviderId, setEditingProviderId] = useState(selectedProvider?.id ?? "draft");
-  const [providerDraft, setProviderDraft] = useState<AiProvider>(selectedProvider ?? defaultProviderDraft);
+  const [providerDraft, setProviderDraft] = useState<AiProvider>(() => selectedProvider ?? createDefaultProviderDraft(t));
   const [isCreatingProvider, setIsCreatingProvider] = useState(false);
   const [exactText, setExactText] = useState("");
   const [prompt, setPrompt] = useState("");
@@ -134,18 +135,20 @@ export function AiPanel({ settings, setSettings, setStatus }: AiPanelProps) {
       if (selectedProvider && !isCreatingProvider) {
         setEditingProviderId(selectedProvider.id);
         setProviderDraft(selectedProvider);
+      } else if (!isCreatingProvider) {
+        setProviderDraft(createDefaultProviderDraft(t));
       }
       return;
     }
     const provider = settings.aiProviders.find((item) => item.id === editingProviderId) ?? selectedProvider;
     if (!provider) {
       setEditingProviderId("draft");
-      setProviderDraft(defaultProviderDraft);
+      setProviderDraft(createDefaultProviderDraft(t));
       return;
     }
     setEditingProviderId(provider.id);
     setProviderDraft(provider);
-  }, [editingProviderId, isCreatingProvider, selectedProvider, settings.aiProviders]);
+  }, [editingProviderId, isCreatingProvider, selectedProvider, settings.aiProviders, t]);
 
   const activeProvider = providerDraft;
   const exactFilter = useMemo(
@@ -190,12 +193,12 @@ export function AiPanel({ settings, setSettings, setStatus }: AiPanelProps) {
     };
   }, [exactFilter, setStatus]);
 
-  async function saveProvider(feedbackText = "Model settings saved"): Promise<AiProvider | null> {
+  async function saveProvider(feedbackText = t("ai.settingsSaved")): Promise<AiProvider | null> {
     const existingProvider = settings.aiProviders.find((item) => item.id === activeProvider.id && activeProvider.id !== "draft");
     const provider: AiProvider = {
       ...activeProvider,
       id: existingProvider?.id ?? newId("provider"),
-      name: activeProvider.model.trim() || activeProvider.name.trim() || "Model Service",
+      name: activeProvider.model.trim() || activeProvider.name.trim() || t("ai.modelService"),
       baseUrl: activeProvider.baseUrl.trim(),
       apiKey: activeProvider.apiKey.trim(),
       model: activeProvider.model.trim(),
@@ -209,7 +212,7 @@ export function AiPanel({ settings, setSettings, setStatus }: AiPanelProps) {
     const nextSettings = reorderDefaultProvider({ ...settings, aiProviders: nextProviders, defaultProviderId: provider.id }, provider.id);
     const allowed = await ensureApiHostPermission(nextSettings, provider.id);
     if (!allowed) {
-      setModelFeedback({ tone: "error", text: "API domain access was not granted" });
+      setModelFeedback({ tone: "error", text: t("ai.apiAccessDenied") });
       return null;
     }
     setSettings(nextSettings);
@@ -223,12 +226,12 @@ export function AiPanel({ settings, setSettings, setStatus }: AiPanelProps) {
   }
 
   async function testProvider() {
-    const provider = await saveProvider("Testing connection...");
+    const provider = await saveProvider(t("ai.testingConnection"));
     if (!provider) return;
-    setModelFeedback({ tone: "neutral", text: "Testing connection..." });
+    setModelFeedback({ tone: "neutral", text: t("ai.testingConnection") });
     try {
       await sendToBackground({ type: "TEST_AI_PROVIDER", providerId: provider.id });
-      setModelFeedback({ tone: "success", text: "Connection test passed" });
+      setModelFeedback({ tone: "success", text: t("ai.connectionPassed") });
     } catch (error) {
       setModelFeedback({ tone: "error", text: error instanceof Error ? error.message : String(error) });
     }
@@ -248,10 +251,13 @@ export function AiPanel({ settings, setSettings, setStatus }: AiPanelProps) {
       setRecords(result.records);
       setSelected(new Set());
       if (result.debug.batchErrors.length) {
-        setStatus(formatAiQueryFailureStatus(`AI query had ${result.debug.batchErrors.length} failed batch(es): ${result.debug.batchErrors[0].message}`));
+        setStatus(formatAiQueryFailureStatus(
+          t("ai.failedBatch", { count: result.debug.batchErrors.length, message: result.debug.batchErrors[0].message }),
+          language
+        ));
       }
     } catch (error) {
-      setStatus(formatAiQueryFailureStatus(error instanceof Error ? error.message : String(error)));
+      setStatus(formatAiQueryFailureStatus(error instanceof Error ? error.message : String(error), language));
     } finally {
       setLoading(false);
     }
@@ -280,7 +286,7 @@ export function AiPanel({ settings, setSettings, setStatus }: AiPanelProps) {
   function addProviderDraft() {
     setEditingProviderId("draft");
     setIsCreatingProvider(true);
-    setProviderDraft(defaultProviderDraft);
+    setProviderDraft(createDefaultProviderDraft(t));
     setModelFeedback(null);
     setShowKey(false);
     setModelOpen(true);
@@ -296,7 +302,7 @@ export function AiPanel({ settings, setSettings, setStatus }: AiPanelProps) {
     setLoading(true);
     try {
       await Promise.all(selectedUrls.map((url) => sendToBackground({ type: "OPEN_URL", url })));
-      setStatus(`Opened ${selectedUrls.length} history record(s)`);
+      setStatus(t("history.opened", { count: selectedUrls.length }));
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
     } finally {
@@ -309,7 +315,7 @@ export function AiPanel({ settings, setSettings, setStatus }: AiPanelProps) {
     setLoading(true);
     try {
       const result = await sendToBackground({ type: "DELETE_URLS", urls: selectedUrls });
-      setStatus(`Deleted ${result.deletedCount} URL history entr${result.deletedCount === 1 ? "y" : "ies"}`);
+      setStatus(t("history.deleted", { count: result.deletedCount, entry: historyEntryWord(language, result.deletedCount) }));
       setRecords((previous) => previous.filter((record) => !selected.has(record.id)));
       setSelected(new Set());
     } catch (error) {
@@ -328,38 +334,38 @@ export function AiPanel({ settings, setSettings, setStatus }: AiPanelProps) {
             <input
               value={exactText}
               onChange={(event) => setExactText(event.target.value)}
-              placeholder="Search history"
+              placeholder={t("ai.searchPlaceholder")}
             />
           </div>
         </div>
 
         <div className="time-chip-row">
-          {timeRangeOptions.map((option) => (
+          {timeRangeModes.map((mode) => (
             <button
-              className={timeRange.mode === option.mode ? "time-chip is-active" : "time-chip"}
-              key={option.mode}
-              onClick={() => setTimeRange((value) => ({ ...value, mode: option.mode }))}
+              className={timeRange.mode === mode ? "time-chip is-active" : "time-chip"}
+              key={mode}
+              onClick={() => setTimeRange((value) => ({ ...value, mode }))}
               type="button"
             >
-              {option.label}
+              {t(rangeLabelKey(mode))}
             </button>
           ))}
           <input
-            aria-label="Start date"
+            aria-label={t("common.startDate")}
             className="date-input"
             inputMode="numeric"
             pattern="\d{4}-\d{2}-\d{2}"
-            placeholder="YYYY-MM-DD"
+            placeholder={t("common.datePlaceholder")}
             type="text"
             value={timeRange.startDate ?? ""}
             onChange={(event) => setTimeRange((value) => ({ ...value, mode: "custom", startDate: event.target.value }))}
           />
           <input
-            aria-label="End date"
+            aria-label={t("common.endDate")}
             className="date-input"
             inputMode="numeric"
             pattern="\d{4}-\d{2}-\d{2}"
-            placeholder="YYYY-MM-DD"
+            placeholder={t("common.datePlaceholder")}
             type="text"
             value={timeRange.endDate ?? ""}
             onChange={(event) => setTimeRange((value) => ({ ...value, mode: "custom", endDate: event.target.value }))}
@@ -373,47 +379,47 @@ export function AiPanel({ settings, setSettings, setStatus }: AiPanelProps) {
             onKeyDown={(event) => {
               if (event.key === "Enter") void runAiQuery();
             }}
-            placeholder="I saw a tool or tutorial page a few days ago but can't remember its name."
+            placeholder={t("ai.promptPlaceholder")}
           />
           <button className="primary" onClick={runAiQuery} disabled={loading || !prompt.trim()} type="button">
             <Brain size={15} />
-            AI Query
+            {t("ai.query")}
           </button>
         </div>
 
         <section className="model-fold">
           <button className="model-fold-title" onClick={() => setModelOpen((value) => !value)} type="button">
-            <span>Model Settings</span>
-            <small>{modelLabel(activeProvider)}</small>
+            <span>{t("ai.modelSettings")}</span>
+            <small>{modelLabel(activeProvider, t)}</small>
             {modelOpen ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
           </button>
           {modelOpen ? (
             <div className="model-config-grid">
-              <div className="model-tabs-row" aria-label="Model services">
+              <div className="model-tabs-row" aria-label={t("ai.modelServices")}>
                 {settings.aiProviders.map((provider) => (
                   <button
                     className={editingProviderId === provider.id ? "model-tab is-active" : "model-tab"}
                     key={provider.id}
                     onClick={() => void selectProvider(provider)}
-                    title={modelLabel(provider)}
+                    title={modelLabel(provider, t)}
                     type="button"
                   >
-                    {modelLabel(provider)}
+                    {modelLabel(provider, t)}
                   </button>
                 ))}
                 {editingProviderId === "draft" ? (
                   <button className="model-tab is-active" type="button">
-                    New Model
+                    {t("ai.newModel")}
                   </button>
                 ) : null}
-                <button className="model-add-tab" onClick={addProviderDraft} title="Add model" type="button">
+                <button className="model-add-tab" onClick={addProviderDraft} title={t("ai.addModel")} type="button">
                   <Plus size={14} />
                 </button>
               </div>
               <input
                 value={activeProvider.baseUrl}
                 onChange={(event) => patchProviderDraft({ baseUrl: event.target.value })}
-                placeholder="API endpoint, e.g. https://api.openai.com/v1"
+                placeholder={t("ai.apiEndpointPlaceholder")}
               />
               <div className="secret-row compact">
                 <input
@@ -422,23 +428,23 @@ export function AiPanel({ settings, setSettings, setStatus }: AiPanelProps) {
                   onChange={(event) => patchProviderDraft({ apiKey: event.target.value })}
                   placeholder="API Key"
                 />
-                <button onClick={() => setShowKey((value) => !value)} type="button" title={showKey ? "Hide" : "Show"}>
+                <button onClick={() => setShowKey((value) => !value)} type="button" title={showKey ? t("common.hide") : t("common.show")}>
                   {showKey ? <EyeOff size={14} /> : <Eye size={14} />}
                 </button>
               </div>
               <input
                 value={activeProvider.model}
                 onChange={(event) => patchProviderDraft({ model: event.target.value })}
-                placeholder="Model name, e.g. gpt-4.1-mini"
+                placeholder={t("ai.modelNamePlaceholder")}
               />
               <div className="model-config-actions">
                 <button className="primary" onClick={() => saveProvider()} type="button">
                   <Check size={14} />
-                  Save
+                  {t("common.save")}
                 </button>
                 <button onClick={testProvider} type="button">
                   <TestTube2 size={14} />
-                  Test
+                  {t("common.test")}
                 </button>
                 {modelFeedback ? (
                   <span className={`connection-indicator is-${modelFeedback.tone}`}>
@@ -456,8 +462,9 @@ export function AiPanel({ settings, setSettings, setStatus }: AiPanelProps) {
         className={historyTitleLayout.stacked ? "history-results-title is-stacked" : "history-results-title"}
         ref={historyTitleLayout.ref}
       >
-        <span data-history-title-label="true">History</span>
+        <span data-history-title-label="true">{t("history.title")}</span>
         <HistoryBulkActions
+          t={t}
           records={sortedRecords}
           selected={selected}
           setSelected={setSelected}
@@ -467,10 +474,10 @@ export function AiPanel({ settings, setSettings, setStatus }: AiPanelProps) {
         />
         <label className="confidence-switch" data-history-sort="true">
           <input checked={sortByConfidence} onChange={(event) => updateSortByConfidence(event.target.checked)} type="checkbox" />
-          <span>Sort by confidence</span>
+          <span>{t("history.sortByConfidence")}</span>
         </label>
       </div>
-      <HistoryList records={sortedRecords} selected={selected} setSelected={setSelected} setStatus={setStatus} />
+      <HistoryList language={language} t={t} records={sortedRecords} selected={selected} setSelected={setSelected} setStatus={setStatus} />
     </section>
   );
 }

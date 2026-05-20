@@ -1,0 +1,14 @@
+{
+  "extName": {
+    "message": "历史记录透镜 - AI 查找浏览历史 | 一键清理记录"
+  },
+  "extShortName": {
+    "message": "历史透镜"
+  },
+  "extDescription": {
+    "message": "用大模型查找 Chrome 浏览历史，维护网站清单并一键清理本地浏览记录。"
+  },
+  "extActionTitle": {
+    "message": "打开历史记录透镜"
+  }
+}

@@ -1,7 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   AI_SORT_BY_CONFIDENCE_KEY,
+  UI_LANGUAGE_KEY,
+  detectBrowserLanguage,
+  loadLanguagePreference,
   loadSortByConfidencePreference,
+  saveLanguagePreference,
   saveSortByConfidencePreference
 } from "./localPreferences";
 
@@ -44,5 +48,22 @@ describe("local preferences", () => {
 
     expect(loadSortByConfidencePreference(storage)).toBe(false);
     expect(() => saveSortByConfidencePreference(true, storage)).not.toThrow();
+  });
+
+  it("defaults the UI language from browser languages when there is no saved preference", () => {
+    expect(detectBrowserLanguage(["zh-CN", "en-US"])).toBe("zh");
+    expect(detectBrowserLanguage(["en-US", "zh-CN"])).toBe("en");
+    expect(detectBrowserLanguage(["fr-FR"])).toBe("en");
+    expect(loadLanguagePreference(memoryStorage(null), ["zh-TW"])).toBe("zh");
+  });
+
+  it("loads and saves an explicit UI language preference", () => {
+    const storage = memoryStorage("zh");
+
+    expect(loadLanguagePreference(storage, ["en-US"])).toBe("zh");
+
+    saveLanguagePreference("en", storage);
+    expect(storage.setItem).toHaveBeenLastCalledWith(UI_LANGUAGE_KEY, "en");
+    expect(loadLanguagePreference(storage, ["zh-CN"])).toBe("en");
   });
 });
