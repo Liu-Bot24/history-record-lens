@@ -131,7 +131,7 @@ function LanguageToggle({
 }) {
   return (
     <div className="language-toggle" role="group" aria-label={t("language.label")}>
-      {(["zh", "en"] as const).map((item) => (
+      {(["en", "zh"] as const).map((item) => (
         <button
           key={item}
           className={language === item ? "is-active" : ""}
