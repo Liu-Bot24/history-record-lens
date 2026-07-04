@@ -2,6 +2,8 @@
 
 # History Record Lens
 
+![Stars](https://img.shields.io/github/stars/Liu-Bot24/history-record-lens?style=flat&label=Stars&cache=20260704) ![Forks](https://img.shields.io/github/forks/Liu-Bot24/history-record-lens?style=flat&label=Forks&cache=20260704) ![Views 14d](https://github-stats.liu-qi.cn/api/badge/Liu-Bot24/history-record-lens/views14d.svg?v=4) ![Clones 14d](https://github-stats.liu-qi.cn/api/badge/Liu-Bot24/history-record-lens/clones14d.svg?v=4) ![Downloads](https://img.shields.io/github/downloads/Liu-Bot24/history-record-lens/total?style=flat&label=Downloads&cache=20260704) ![Release](https://img.shields.io/github/v/release/Liu-Bot24/history-record-lens?style=flat&label=Release&cache=20260704)
+
 ![History Record Lens banner](docs/assets/history-record-lens-banner-2.35.jpg)
 
 Languages: [简体中文](README.md) · [English](README-en.md)
